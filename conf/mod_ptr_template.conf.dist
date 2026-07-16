@@ -37,6 +37,7 @@ LevelEnable = true
 #   TemplateResources
 #   TemplateSkills
 #   TemplateSpells
+#   TemplateTalents
 #   TemplateTaximask
 #   TemplateTeleport
 #       Description: Enable various aspects of template sets to be applied.
@@ -55,6 +56,7 @@ TemplateReputation   = true
 TemplateResources    = true
 TemplateSkills       = true
 TemplateSpells       = true
+TemplateTalents      = true
 TemplateTaximask     = true
 TemplateTeleport     = true
 
@@ -135,3 +137,12 @@ DisableListSecurity = 2
 #                     4  - (Disabled)
 
 StatusSecurityText = 2
+
+#
+#    ListFilterByClass
+#        Description: When a player runs ".template list", only show templates applicable to their class
+#                     (derived from the ClassMask of each template's items). Console/GM listing is unaffected.
+#        Default:     true  - (Enabled, players see only their own class's templates)
+#                     false - (Disabled, show every template to everyone)
+
+ListFilterByClass = true

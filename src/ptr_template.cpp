@@ -120,6 +120,25 @@ public:
                     }
                     break;
                 case 8:
+                    if (sConfigMgr->GetOption<bool>("TemplateSpells", true))
+                    {
+                        AddTemplateSpells(player, index);
+                        player->SaveToDB(false, false);
+                        LOG_DEBUG("module", "Finished applying spells for template character {}.", player->GetGUID().ToString());
+                    }
+                    break;
+                case 9:
+                    if (sConfigMgr->GetOption<bool>("TemplateTalents", true))
+                    {
+                        // Applied after spells (so AddTemplateSpells' cosmetic SendTalentReset fires first)
+                        // but BEFORE gear, so talent-gated equips work (e.g. a Titan's Grip warrior
+                        // equipping a two-hander in the off-hand).
+                        AddTemplateTalents(player, index);
+                        player->SaveToDB(false, false);
+                        LOG_DEBUG("module", "Finished applying talents and glyphs for template character {}.", player->GetGUID().ToString());
+                    }
+                    break;
+                case 10:
                     if (sConfigMgr->GetOption<bool>("TemplateEquipGear", true))
                     {
                         TemplateHelperItemCleanup(player, SCOPE_EQUIPPED, itemRoutine);
@@ -128,7 +147,7 @@ public:
                         LOG_DEBUG("module", "Finished applying equipment for template character {}.", player->GetGUID().ToString());
                     }
                     break;
-                case 9:
+                case 11:
                     if (sConfigMgr->GetOption<bool>("TemplateBagGear", true))
                     {
                         TemplateHelperItemCleanup(player, SCOPE_BAGS, itemRoutine);
@@ -137,15 +156,7 @@ public:
                         LOG_DEBUG("module", "Finished applying inventory items for template character {}.", player->GetGUID().ToString());
                     }
                     break;
-                case 10:
-                    if (sConfigMgr->GetOption<bool>("TemplateSpells", true))
-                    {
-                        AddTemplateSpells(player, index);
-                        player->SaveToDB(false, false);
-                        LOG_DEBUG("module", "Finished applying spells for template character {}.", player->GetGUID().ToString());
-                    }
-                    break;
-                case 11:
+                case 12:
                     if (sConfigMgr->GetOption<bool>("TemplateHotbar", true))
                     {
                         AddTemplateHotbar(player, index);
@@ -153,7 +164,7 @@ public:
                         LOG_DEBUG("module", "Finished applying hotbar spells for template character {}.", player->GetGUID().ToString());
                     }
                     break;
-                case 12:
+                case 13:
                     if (sConfigMgr->GetOption<bool>("TemplateTeleport", true))
                     {
                         AddTemplatePosition(player, index);
@@ -161,7 +172,7 @@ public:
                         LOG_DEBUG("module", "Finished teleporting template character {}.", player->GetGUID().ToString());
                     }
                     break;
-                case 13:
+                case 14:
                     if (sConfigMgr->GetOption<bool>("TemplateResources", true))
                     {
                         AddTemplateResources(player);
@@ -194,7 +205,13 @@ public:
             "SELECT ID FROM mod_ptrtemplate_achievements WHERE(ID = {} AND RaceMask & {} AND ClassMask & {})"
             " UNION ALL "
             "SELECT ID FROM mod_ptrtemplate_quests WHERE(ID = {} AND RaceMask & {} AND ClassMask & {})"
+            " UNION ALL "
+            "SELECT ID FROM mod_ptrtemplate_talents WHERE(ID = {} AND RaceMask & {} AND ClassMask & {})"
+            " UNION ALL "
+            "SELECT ID FROM mod_ptrtemplate_glyphs WHERE(ID = {} AND RaceMask & {} AND ClassMask & {})"
             ") AS combined",
+            index, raceMask, classMask,
+            index, raceMask, classMask,
             index, raceMask, classMask,
             index, raceMask, classMask,
             index, raceMask, classMask,
@@ -618,6 +635,72 @@ private:
         }
     }
 
+    static void AddTemplateTalents(Player* player, uint32 index)
+    {
+        // Wipe any pre-existing talents/glyphs so the template build applies from a clean slate.
+        player->resetTalents(true);
+
+        //                                                        0
+        QueryResult talentInfo = WorldDatabase.Query("SELECT SpellID FROM mod_ptrtemplate_talents WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+        if (talentInfo)
+        {
+            // Resolve each final-rank talent spell to its Talent.dbc entry, then apply in ascending
+            // talent-row order so every DependsOn prerequisite is already learned (the one check that
+            // LearnTalent(..., command = true) does not bypass).
+            std::vector<std::pair<uint32, TalentSpellPos const*>> talents; // <talent row, talent position>
+            do
+            {
+                uint32 spellEntry = (*talentInfo)[0].Get<uint32>();
+
+                TalentSpellPos const* talentPos = GetTalentSpellPos(spellEntry);
+                if (!talentPos)
+                {
+                    LOG_ERROR("module", "Template spell {} is not a talent, skipping for character {}.", spellEntry, player->GetGUID().ToString());
+                    continue;
+                }
+
+                TalentEntry const* talentEntry = sTalentStore.LookupEntry(talentPos->talent_id);
+                talents.emplace_back(talentEntry ? talentEntry->Row : 0, talentPos);
+            } while (talentInfo->NextRow());
+
+            std::sort(talents.begin(), talents.end(), [](std::pair<uint32, TalentSpellPos const*> const& left, std::pair<uint32, TalentSpellPos const*> const& right)
+                {
+                    return left.first < right.first;
+                });
+
+            for (auto const& talent : talents)
+            {
+                TalentSpellPos const* talentPos = talent.second;
+                player->LearnTalent(talentPos->talent_id, talentPos->rank, true); // command = true: bypasses point/tier gates, keeps prerequisite arrows.
+                LOG_DEBUG("module", "Learned talent {} (rank {}) for template character {}.", talentPos->talent_id, talentPos->rank, player->GetGUID().ToString());
+            }
+        }
+
+        //                                                      0      1
+        QueryResult glyphInfo = WorldDatabase.Query("SELECT Slot, GlyphID FROM mod_ptrtemplate_glyphs WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+        if (glyphInfo)
+        {
+            do
+            {
+                uint8 slotEntry = (*glyphInfo)[0].Get<uint8>();
+                uint32 glyphEntry = (*glyphInfo)[1].Get<uint32>();
+
+                GlyphPropertiesEntry const* glyphProperties = sGlyphPropertiesStore.LookupEntry(glyphEntry);
+                if (!glyphProperties)
+                {
+                    LOG_ERROR("module", "Template glyph {} does not exist, skipping for character {}.", glyphEntry, player->GetGUID().ToString());
+                    continue;
+                }
+
+                player->SetGlyph(slotEntry, glyphEntry, true);
+                player->CastSpell(player, glyphProperties->SpellId, true); // Apply the glyph aura this session (mirrors _LoadGlyphAuras).
+                LOG_DEBUG("module", "Set glyph {} in slot {} for template character {}.", glyphEntry, slotEntry, player->GetGUID().ToString());
+            } while (glyphInfo->NextRow());
+        }
+
+        player->InitTalentForLevel(); // Recompute free points and push talent + glyph info to the client.
+    }
+
     static void AddTemplateTaxi(Player* player, uint32 index)
     { //                                                          0           1
         QueryResult taxiEntry = WorldDatabase.Query("SELECT TaxiAlliance, TaxiHorde FROM mod_ptrtemplate_index WHERE ID = {}", index);
@@ -998,10 +1081,31 @@ public:
                 ? SEC_CONSOLE
                 : handler->GetSession()->GetSecurity();
 
+            // Only show templates applicable to the player's class. The index carries no class column,
+            // so class membership is derived from the ClassMask on the template's inventory rows.
+            // Console/GM listing is unaffected; toggle via ListFilterByClass.
+            uint32 playerClassMask = 0;
+            bool filterByClass = !handler->IsConsole() && sConfigMgr->GetOption<bool>("ListFilterByClass", true);
+            if (filterByClass)
+            {
+                if (Player* player = handler->GetSession()->GetPlayer())
+                    playerClassMask = player->getClassMask();
+                else
+                    filterByClass = false;
+            }
+
             do
             {
                 uint8 indexEntry = (*index)[0].Get<uint8>();
                 uint8 enableEntry = (*index)[1].Get<uint8>();
+
+                if (filterByClass)
+                {
+                    QueryResult classMatch = WorldDatabase.Query("SELECT 1 FROM mod_ptrtemplate_inventory WHERE ID = {} AND ClassMask & {} LIMIT 1", indexEntry, playerClassMask);
+                    if (!classMatch)
+                        continue;
+                }
+
                 std::string templateName = GetTemplateName(handler, indexEntry);
 
                 if ((playerSecurity >= sConfigMgr->GetOption<int8>("EnableListSecurity", true) && enableEntry) || (playerSecurity >= sConfigMgr->GetOption<int8>("DisableListSecurity", true) && !enableEntry))

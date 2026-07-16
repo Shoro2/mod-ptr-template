@@ -1,4 +1,3 @@
-DROP TABLE IF EXISTS `mod_ptrtemplate_index`;
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_index` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
 	`Keywords` TEXT NULL DEFAULT NULL,
@@ -32,7 +31,6 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_index` (
 	PRIMARY KEY (`ID`)
 ) COLLATE='utf8mb4_general_ci';
 
-DROP TABLE IF EXISTS `mod_ptrtemplate_achievements`;
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_achievements` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
 	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
@@ -41,7 +39,6 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_achievements` (
 	`Comment` TEXT NULL DEFAULT NULL
 ) COLLATE='utf8mb4_general_ci';
 
-DROP TABLE IF EXISTS `mod_ptrtemplate_action`;
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_action` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
 	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
@@ -52,7 +49,6 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_action` (
 	`Comment` TEXT NULL DEFAULT NULL
 ) COLLATE='utf8mb4_general_ci';
 
-DROP TABLE IF EXISTS `mod_ptrtemplate_inventory`;
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_inventory` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
 	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
@@ -71,7 +67,6 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_inventory` (
 	`Comment` TEXT NULL DEFAULT NULL
 ) COLLATE='utf8mb4_general_ci';
 
-DROP TABLE IF EXISTS `mod_ptrtemplate_locale`;
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_locale` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
 	`koKR` TEXT NULL DEFAULT NULL COMMENT 'Korean template name translation',
@@ -85,7 +80,6 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_locale` (
 	PRIMARY KEY (`ID`)
 ) COLLATE='utf8mb4_general_ci';
 
-DROP TABLE IF EXISTS `mod_ptrtemplate_quests`;
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_quests` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
 	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
@@ -94,7 +88,6 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_quests` (
 	`Comment` TEXT NULL DEFAULT NULL
 ) COLLATE='utf8mb4_general_ci';
 
-DROP TABLE IF EXISTS `mod_ptrtemplate_reputations`;
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_reputations` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
 	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
@@ -104,7 +97,6 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_reputations` (
 	`Comment` TEXT NULL DEFAULT NULL
 ) COLLATE='utf8mb4_general_ci';
 
-DROP TABLE IF EXISTS `mod_ptrtemplate_skills`;
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_skills` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
 	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
@@ -115,11 +107,27 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_skills` (
 	`Comment` TEXT NULL DEFAULT NULL
 ) COLLATE='utf8mb4_general_ci';
 
-DROP TABLE IF EXISTS `mod_ptrtemplate_spells`;
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_spells` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
 	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
 	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
 	`SpellID` MEDIUMINT(7) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Spell entry',
+	`Comment` TEXT NULL DEFAULT NULL
+) COLLATE='utf8mb4_general_ci';
+
+CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_talents` (
+	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
+	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
+	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
+	`SpellID` MEDIUMINT(7) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Final-rank talent spell entry (Talent.dbc ID + rank derived via GetTalentSpellPos)',
+	`Comment` TEXT NULL DEFAULT NULL
+) COLLATE='utf8mb4_general_ci';
+
+CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_glyphs` (
+	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
+	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
+	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
+	`Slot` TINYINT(3) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Glyph slot index (0-5; 0/1/4 minor or major per GlyphSlot.dbc)',
+	`GlyphID` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'GlyphProperties.dbc ID',
 	`Comment` TEXT NULL DEFAULT NULL
 ) COLLATE='utf8mb4_general_ci';

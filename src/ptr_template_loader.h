@@ -1,9 +1,14 @@
 #include "Chat.h"
 #include "Config.h"
+#include "DBCStores.h"
 #include "Player.h"
 #include "ReputationMgr.h"
 #include "ScriptMgr.h"
 #include "TaskScheduler.h"
+
+#include <algorithm>
+#include <utility>
+#include <vector>
 
 #define module_string "ptr-template"
 

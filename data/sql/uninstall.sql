@@ -7,6 +7,8 @@ DROP TABLE IF EXISTS `mod_ptrtemplate_quests`;
 DROP TABLE IF EXISTS `mod_ptrtemplate_reputations`;
 DROP TABLE IF EXISTS `mod_ptrtemplate_skills`;
 DROP TABLE IF EXISTS `mod_ptrtemplate_spells`;
+DROP TABLE IF EXISTS `mod_ptrtemplate_talents`;
+DROP TABLE IF EXISTS `mod_ptrtemplate_glyphs`;
 
 DELETE FROM `command` WHERE `name` IN ('template apply', 'template disable', 'template enable', 'template list');
 DELETE FROM `acore_string` WHERE `entry` BETWEEN 40000 AND 40020;
