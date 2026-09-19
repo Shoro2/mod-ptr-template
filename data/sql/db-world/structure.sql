@@ -33,16 +33,16 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_index` (
 
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_achievements` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
-	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
-	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
+	`RaceMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races (1 << race-1; races reach 21)',
+	`ClassMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes (1 << class-1; class 32 is bit 31 = 2147483648)',
 	`AchievementID` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Achievement entry',
 	`Comment` TEXT NULL DEFAULT NULL
 ) COLLATE='utf8mb4_general_ci';
 
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_action` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
-	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
-	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
+	`RaceMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races (1 << race-1; races reach 21)',
+	`ClassMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes (1 << class-1; class 32 is bit 31 = 2147483648)',
 	`Button` TINYINT(3) UNSIGNED NOT NULL DEFAULT '0',
 	`Action` INT(10) UNSIGNED NOT NULL DEFAULT '0',
 	`Type` TINYINT(3) UNSIGNED NOT NULL DEFAULT '0',
@@ -51,8 +51,8 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_action` (
 
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_inventory` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
-	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
-	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
+	`RaceMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races (1 << race-1; races reach 21)',
+	`ClassMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes (1 << class-1; class 32 is bit 31 = 2147483648)',
 	`BagID` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bag ID the item should be placed in',
 	`SlotID` TINYINT(3) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Slot ID the item should be placed in',
 	`ItemID` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Item entry',
@@ -82,16 +82,16 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_locale` (
 
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_quests` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
-	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
-	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
+	`RaceMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races (1 << race-1; races reach 21)',
+	`ClassMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes (1 << class-1; class 32 is bit 31 = 2147483648)',
 	`QuestID` MEDIUMINT(7) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'quest_template entry ID',
 	`Comment` TEXT NULL DEFAULT NULL
 ) COLLATE='utf8mb4_general_ci';
 
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_reputations` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
-	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
-	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
+	`RaceMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races (1 << race-1; races reach 21)',
+	`ClassMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes (1 << class-1; class 32 is bit 31 = 2147483648)',
 	`FactionID` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Faction entry',
 	`Standing` INT(10) NOT NULL DEFAULT '0' COMMENT 'Reputation value',
 	`Comment` TEXT NULL DEFAULT NULL
@@ -99,8 +99,8 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_reputations` (
 
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_skills` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
-	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
-	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
+	`RaceMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races (1 << race-1; races reach 21)',
+	`ClassMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes (1 << class-1; class 32 is bit 31 = 2147483648)',
 	`SkillID` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'SkillLine entry',
 	`Value` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Skill level',
 	`Max` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Max value of the skill',
@@ -109,24 +109,24 @@ CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_skills` (
 
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_spells` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
-	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
-	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
+	`RaceMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races (1 << race-1; races reach 21)',
+	`ClassMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes (1 << class-1; class 32 is bit 31 = 2147483648)',
 	`SpellID` MEDIUMINT(7) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Spell entry',
 	`Comment` TEXT NULL DEFAULT NULL
 ) COLLATE='utf8mb4_general_ci';
 
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_talents` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
-	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
-	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
+	`RaceMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races (1 << race-1; races reach 21)',
+	`ClassMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes (1 << class-1; class 32 is bit 31 = 2147483648)',
 	`SpellID` MEDIUMINT(7) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Final-rank talent spell entry (Talent.dbc ID + rank derived via GetTalentSpellPos)',
 	`Comment` TEXT NULL DEFAULT NULL
 ) COLLATE='utf8mb4_general_ci';
 
 CREATE TABLE IF NOT EXISTS `mod_ptrtemplate_glyphs` (
 	`ID` TINYINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Template index ID',
-	`RaceMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races',
-	`ClassMask` SMALLINT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes',
+	`RaceMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable races (1 << race-1; races reach 21)',
+	`ClassMask` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Bitmask for applicable classes (1 << class-1; class 32 is bit 31 = 2147483648)',
 	`Slot` TINYINT(3) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Glyph slot index (0-5; 0/1/4 minor or major per GlyphSlot.dbc)',
 	`GlyphID` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'GlyphProperties.dbc ID',
 	`Comment` TEXT NULL DEFAULT NULL
