@@ -61,6 +61,47 @@ TemplateTaximask     = true
 TemplateTeleport     = true
 
 #
+#   TemplateTalentRanks
+#       Description: Learn the trainer ranks, up to the character's level, of every ability a
+#                    learned talent teaches (a talent gives rank 1 only: Pyroblast, Devastate,
+#                    Haunt ...). Never a further rank of the talent itself.
+#       Default:     true
+#
+#   TemplateParagon
+#   TemplateParagon.MinLevel
+#       Description: Raise the account's Paragon level (mod-paragon) to at least MinLevel before
+#                    the gear; never lowers it, capped at Paragon.MaxLevel. 0 = no floor.
+#       Default:     true, 200
+#
+#   TemplateClassKit
+#   TemplateHunterPet.Entry
+#       Description: What no template row carries: a hunter's ammo (a matching arrow or bullet
+#                    from the bags) and pet (a tamed pet of creature Entry at the hunter's level,
+#                    unless the hunter has one), a shaman's four totems (5175-5178).
+#       Default:     true, 26672 (Bloodthirsty Tundra Wolf; must be tameable)
+#
+#   TemplateParagonRolls
+#       Description: mod-paragon-itemgen's Paragon enchantments on every worn item, all cursed,
+#                    at the character's Paragon level; the template's profile
+#                    (mod_ptrtemplate_profile: role, main stat, spec) becomes the character's.
+#       Default:     true
+#
+#   TemplateRemnants
+#   TemplateRemnants.Pct
+#       Description: Top up each of mod-forgotten-talents' five Remnants to Pct percent of what
+#                    its whole tree costs under the live conf.
+#       Default:     true, 75
+
+TemplateTalentRanks      = true
+TemplateParagon          = true
+TemplateParagon.MinLevel = 200
+TemplateClassKit         = true
+TemplateHunterPet.Entry  = 26672
+TemplateParagonRolls     = true
+TemplateRemnants         = true
+TemplateRemnants.Pct     = 75
+
+#
 #    DeleteItems
 #        Description: Set whether items in inventory before the template is applied are deleted entirely or sent through the mail.
 #        Default:     true  - (Enabled, delete items in inventory)

@@ -139,6 +139,23 @@ public:
                     }
                     break;
                 case 10:
+                    if (sConfigMgr->GetOption<bool>("TemplateTalentRanks", true))
+                    {
+                        AddTemplateTalentRanks(player);
+                        player->SaveToDB(false, false);
+                        LOG_DEBUG("module", "Finished applying talent ability ranks for template character {}.", player->GetGUID().ToString());
+                    }
+                    break;
+                case 11:
+                    if (sConfigMgr->GetOption<bool>("TemplateParagon", true))
+                    {
+                        // Before the gear, so its rolls see the raised level.
+                        AddTemplateParagon(player);
+                        player->SaveToDB(false, false);
+                        LOG_DEBUG("module", "Finished applying the Paragon floor for template character {}.", player->GetGUID().ToString());
+                    }
+                    break;
+                case 12:
                     if (sConfigMgr->GetOption<bool>("TemplateEquipGear", true))
                     {
                         TemplateHelperItemCleanup(player, SCOPE_EQUIPPED, itemRoutine);
@@ -147,7 +164,7 @@ public:
                         LOG_DEBUG("module", "Finished applying equipment for template character {}.", player->GetGUID().ToString());
                     }
                     break;
-                case 11:
+                case 13:
                     if (sConfigMgr->GetOption<bool>("TemplateBagGear", true))
                     {
                         TemplateHelperItemCleanup(player, SCOPE_BAGS, itemRoutine);
@@ -156,7 +173,32 @@ public:
                         LOG_DEBUG("module", "Finished applying inventory items for template character {}.", player->GetGUID().ToString());
                     }
                     break;
-                case 12:
+                case 14:
+                    if (sConfigMgr->GetOption<bool>("TemplateClassKit", true))
+                    {
+                        // After the bag gear: its cleanup deletes the bags' contents.
+                        AddTemplateClassKit(player);
+                        player->SaveToDB(false, false);
+                        LOG_DEBUG("module", "Finished applying the class kit for template character {}.", player->GetGUID().ToString());
+                    }
+                    break;
+                case 15:
+                    if (sConfigMgr->GetOption<bool>("TemplateParagonRolls", true))
+                    {
+                        AddTemplateParagonRolls(player, index);
+                        player->SaveToDB(false, false);
+                        LOG_DEBUG("module", "Finished applying Paragon rolls for template character {}.", player->GetGUID().ToString());
+                    }
+                    break;
+                case 16:
+                    if (sConfigMgr->GetOption<bool>("TemplateRemnants", true))
+                    {
+                        AddTemplateRemnants(player);
+                        player->SaveToDB(false, false);
+                        LOG_DEBUG("module", "Finished applying Forgotten Talents currencies for template character {}.", player->GetGUID().ToString());
+                    }
+                    break;
+                case 17:
                     if (sConfigMgr->GetOption<bool>("TemplateHotbar", true))
                     {
                         AddTemplateHotbar(player, index);
@@ -164,7 +206,7 @@ public:
                         LOG_DEBUG("module", "Finished applying hotbar spells for template character {}.", player->GetGUID().ToString());
                     }
                     break;
-                case 13:
+                case 18:
                     if (sConfigMgr->GetOption<bool>("TemplateTeleport", true))
                     {
                         AddTemplatePosition(player, index);
@@ -172,7 +214,7 @@ public:
                         LOG_DEBUG("module", "Finished teleporting template character {}.", player->GetGUID().ToString());
                     }
                     break;
-                case 14:
+                case 19:
                     if (sConfigMgr->GetOption<bool>("TemplateResources", true))
                     {
                         AddTemplateResources(player);
@@ -699,6 +741,176 @@ private:
         }
 
         player->InitTalentForLevel(); // Recompute free points and push talent + glyph info to the client.
+    }
+
+    // A talent that teaches an ability gives its first rank only (Pyroblast,
+    // Devastate, Haunt ...); the later ranks come from a trainer. Learns every
+    // rank up to the character's level of each ability a learned talent brings -
+    // the talent's own spell or the spell it teaches - but never a further rank
+    // of the talent itself (its Talent.dbc RankID), which LearnTalent decided.
+    static void AddTemplateTalentRanks(Player* player)
+    {
+        uint32 learned = 0;
+        std::vector<uint32> abilities;
+        for (auto const& [spellId, talent] : player->GetTalentMap())
+        {
+            if (!talent || talent->State == PLAYERSPELL_REMOVED || !talent->IsInSpec(player->GetActiveSpec()))
+                continue;
+
+            TalentEntry const* talentEntry = sTalentStore.LookupEntry(talent->talentID);
+            SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId);
+            if (!talentEntry || !spellInfo)
+                continue;
+
+            abilities.clear();
+            abilities.push_back(spellId);
+            for (SpellEffectInfo const& effect : spellInfo->Effects)
+                if (effect.Effect == SPELL_EFFECT_LEARN_SPELL && effect.TriggerSpell)
+                    abilities.push_back(effect.TriggerSpell);
+
+            for (uint32 ability : abilities)
+            {
+                for (uint32 next = sSpellMgr->GetNextSpellInChain(ability); next; next = sSpellMgr->GetNextSpellInChain(next))
+                {
+                    if (std::find(std::begin(talentEntry->RankID), std::end(talentEntry->RankID), next) != std::end(talentEntry->RankID))
+                        break; // a talent rank, not a trainer rank
+
+                    SpellInfo const* rankInfo = sSpellMgr->GetSpellInfo(next);
+                    if (!rankInfo || rankInfo->SpellLevel > player->GetLevel())
+                        break;
+
+                    if (player->HasSpell(next))
+                        continue;
+
+                    player->learnSpell(next);
+                    ++learned;
+                }
+            }
+        }
+        LOG_DEBUG("module", "Template character {} learned {} trainer rank(s) of its talent abilities.", player->GetGUID().ToString(), learned);
+    }
+
+    // The operator's floor (2026-09-28): a template character plays at least at
+    // Paragon TemplateParagon.MinLevel (mod-paragon, account-wide; never lowered).
+    static void AddTemplateParagon(Player* player)
+    {
+        uint32 const floor = sConfigMgr->GetOption<uint32>("TemplateParagon.MinLevel", 200);
+        if (floor && SetParagonLevelAtLeast(player, floor))
+            ChatHandler(player->GetSession()).PSendSysMessage("Your Paragon level is now {}.", GetParagonLevel(player));
+    }
+
+    // What a class needs that no template row carries: a hunter's ammo (a row
+    // in the bags is not equipped) and pet, a shaman's four totems (the bag
+    // cleanup deleted the ones the first login handed out).
+    static void AddTemplateClassKit(Player* player)
+    {
+        if (player->getClass() == CLASS_SHAMAN)
+        {
+            for (uint32 totem : SHAMAN_TOTEMS)
+                if (!player->HasItemCount(totem, 1, true))
+                    player->AddItem(totem, 1);
+            return;
+        }
+        if (player->getClass() != CLASS_HUNTER)
+            return;
+
+        Item* ranged = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_RANGED);
+        if (ranged && ranged->GetTemplate()->AmmoType && !player->GetUInt32Value(PLAYER_AMMO_ID))
+        {
+            uint32 const ammoType = ranged->GetTemplate()->AmmoType;
+            bool found = false;
+            auto consider = [&](Item* item)
+            {
+                if (found || !item)
+                    return;
+                ItemTemplate const* proto = item->GetTemplate();
+                if (proto->Class == ITEM_CLASS_PROJECTILE && proto->SubClass == ammoType &&
+                    player->CanUseAmmo(proto->ItemId) == EQUIP_ERR_OK)
+                {
+                    player->SetAmmo(proto->ItemId);
+                    found = true;
+                }
+            };
+            for (uint8 slot = INVENTORY_SLOT_ITEM_START; slot < INVENTORY_SLOT_ITEM_END; ++slot)
+                consider(player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
+            for (uint8 bagSlot = INVENTORY_SLOT_BAG_START; bagSlot < INVENTORY_SLOT_BAG_END; ++bagSlot)
+                if (Bag* bag = player->GetBagByPos(bagSlot))
+                    for (uint8 slot = 0; slot < bag->GetBagSize(); ++slot)
+                        consider(bag->GetItemByPos(slot));
+        }
+
+        if (player->IsExistPet())
+            return;
+        // The core's `.pet create` path: a tamed pet at the hunter's level.
+        // Player::CreatePet reads the template's family unchecked, and a
+        // family-0 template crashes the core - hence the tameable check.
+        uint32 const entry = sConfigMgr->GetOption<uint32>("TemplateHunterPet.Entry", 26672);
+        CreatureTemplate const* petInfo = sObjectMgr->GetCreatureTemplate(entry);
+        if (!petInfo || !petInfo->IsTameable(player->CanTameExoticPets()))
+        {
+            LOG_ERROR("module", "TemplateHunterPet.Entry {} is not a creature this hunter can tame; no pet for {}.", entry, player->GetGUID().ToString());
+            return;
+        }
+        if (!player->CreatePet(entry, SPELL_TAME_BEAST_EFFECT))
+            LOG_ERROR("module", "The core refused a pet of {} for template character {}.", entry, player->GetGUID().ToString());
+    }
+
+    // mod-paragon-itemgen's Paragon enchantments on every worn item, all of
+    // them cursed (the operator, 2026-09-28), at the Paragon level the floor
+    // left. The template's roll profile (mod_ptrtemplate_profile: role, main
+    // stat, spec) becomes the character's; a template without one (a generic
+    // template) rolls with the character's own, and nothing without either.
+    static void AddTemplateParagonRolls(Player* player, uint32 index)
+    {
+        ParagonRollProfile profile{};
+        bool const templateProfile = LoadTemplateProfile(player, index, profile);
+        if (templateProfile)
+            ParagonItemGenSetProfile(player, profile);
+
+        uint32 rolled = 0;
+        for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+            if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+                if (ParagonItemGenRollCursed(player, item, templateProfile ? &profile : nullptr, true))
+                    ++rolled;
+
+        if (rolled)
+            ChatHandler(player->GetSession()).PSendSysMessage("{} item(s) carry cursed Paragon stats for Paragon {}.", rolled, GetParagonLevel(player));
+    }
+
+    static bool LoadTemplateProfile(Player* player, uint32 index, ParagonRollProfile& profile)
+    { //                                                   0      1         2
+        QueryResult result = WorldDatabase.Query("SELECT Role, MainStat, SpecID FROM mod_ptrtemplate_profile WHERE (ID = {} AND ClassMask & {})", index, player->getClassMask());
+        if (!result)
+            return false;
+
+        uint8 const role = (*result)[0].Get<uint8>();
+        uint8 const mainStat = (*result)[1].Get<uint8>();
+        uint8 const spec = (*result)[2].Get<uint8>();
+        if (role >= ROLE_MAX || mainStat >= PSTAT_MAX || spec >= SPEC_MAX)
+        {
+            LOG_ERROR("module", "mod_ptrtemplate_profile of template {}: role {}, main stat {} or spec {} is out of range.", index, role, mainStat, spec);
+            return false;
+        }
+        profile = { static_cast<ParagonRole>(role), static_cast<ParagonStatIndex>(mainStat), static_cast<ParagonSpec>(spec) };
+        return true;
+    }
+
+    // The Remnants of mod-forgotten-talents: TemplateRemnants.Pct percent of
+    // what its whole tree costs under the live conf, per tier (the operator:
+    // 75 %). Topped up, so a template applied again does not pile them up.
+    static void AddTemplateRemnants(Player* player)
+    {
+        uint32 const pct = sConfigMgr->GetOption<uint32>("TemplateRemnants.Pct", 75);
+        ForgottenTalents::Service const& talents = ForgottenTalents::Service::Instance();
+        auto const cost = talents.FullTreeCost();
+        auto const items = talents.GetSettings().CurrencyItem;
+        for (std::size_t tier = 0; tier < items.size(); ++tier)
+        {
+            uint64 const want = (uint64(cost[tier]) * pct + 99) / 100;
+            uint64 const have = player->GetItemCount(items[tier], true);
+            if (items[tier] && want > have)
+                player->AddItem(items[tier], uint32(std::min<uint64>(want - have, std::numeric_limits<uint32>::max())));
+        }
     }
 
     static void AddTemplateTaxi(Player* player, uint32 index)

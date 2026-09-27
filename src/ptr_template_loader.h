@@ -1,12 +1,21 @@
+#include "Bag.h"
 #include "Chat.h"
 #include "Config.h"
 #include "DBCStores.h"
+#include "ForgottenTalentsService.h"
+#include "ObjectMgr.h"
+#include "ParagonItemGen.h"
+#include "ParagonUtils.h"
 #include "Player.h"
 #include "ReputationMgr.h"
 #include "ScriptMgr.h"
+#include "SpellInfo.h"
+#include "SpellMgr.h"
 #include "TaskScheduler.h"
 
 #include <algorithm>
+#include <iterator>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -64,8 +73,12 @@ enum itemCleanupCodes
     SCOPE_ALL      = 2
 };
 
+// A shaman's four totems (Earth, Fire, Water, Air).
+static uint32 const SHAMAN_TOTEMS[] = { 5175, 5176, 5177, 5178 };
+
 enum TemplateEnums
 {
+    SPELL_TAME_BEAST_EFFECT = 13481, // Tame Beast's effect: a real taming's creating spell
     APPLY_DELAY          = 25,
     APPLY_RATE           = 50,
     HORDE_SIMILAR        = -1,

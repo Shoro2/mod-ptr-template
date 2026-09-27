@@ -36,6 +36,22 @@ You are also able to edit the [mod_ptr_template.conf](https://github.com/heyitsb
 
 By default, any account can list and apply enabled templates using `.template list` and `.template apply [template index number]` respectively. Gamemaster or higher security will also have disabled templates listed with the list command. Administrators are the only ones that can apply a disabled template. Administrators and the console are also the only ones that can enable/disable templates through the `.template enable/disable [template index number]` command.
 
+## Forgotten Land: the template kit (2026-09-28)
+
+After talents, gear and bags a template now gives what a Forgotten Land character needs to play
+right away (the operator's request; every step has its own switch in the conf):
+
+| Step | Conf | What |
+|---|---|---|
+| talent ability ranks | `TemplateTalentRanks` | a talent that teaches an ability gives rank 1 only (Pyroblast, Devastate, Haunt, Holy Shock ...); the step learns its trainer ranks up to the character's level, never a further rank of the talent itself |
+| Paragon floor | `TemplateParagon`, `TemplateParagon.MinLevel` (200) | mod-paragon `SetParagonLevelAtLeast`: the account's Paragon level at least 200, never lowered; runs before the gear |
+| class kit | `TemplateClassKit`, `TemplateHunterPet.Entry` (26672) | a hunter's ammo (a matching arrow or bullet from the bags - a bag row is not equipped) and pet (a tamed wolf at the hunter's level, the core's `.pet create` path), a shaman's four totems (the bag cleanup deleted the ones the first login gave) |
+| Paragon rolls | `TemplateParagonRolls` | mod-paragon-itemgen's Paragon enchantments on every worn item, **all cursed**, at the character's Paragon level; the template's profile in `mod_ptrtemplate_profile` (role, main stat, spec - templates 20-51) becomes the character's itemgen profile; a template without a row rolls with the character's own profile, or not at all |
+| Remnants | `TemplateRemnants`, `TemplateRemnants.Pct` (75) | each of mod-forgotten-talents' five currencies topped up to 75 % of what its whole tree costs under the live conf (`Service::FullTreeCost`) |
+
+The kit links against mod-paragon, mod-paragon-itemgen and mod-forgotten-talents (all FL modules
+built with it).
+
 ## Creating Template Sets
 
 For information on creating your own template sets (and submitting them here for others to use), please refer to the [wiki](https://github.com/heyitsbench/mod-ptr-template/wiki).
