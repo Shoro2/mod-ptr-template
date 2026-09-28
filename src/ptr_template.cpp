@@ -784,11 +784,14 @@ private:
             ChatHandler(player->GetSession()).PSendSysMessage("Your Paragon level is now {}.", GetParagonLevel(player));
     }
 
-    // What a class needs that no template row carries: a hunter's ammo (a row
-    // in the bags is not equipped) and pet, a shaman's four totems (the bag
-    // cleanup deleted the ones the first login handed out).
+    // What a class needs that no template row carries: the proficiencies of the
+    // worn gear, a hunter's ammo (a row in the bags is not equipped) and pet, a
+    // shaman's four totems (the bag cleanup deleted the ones the first login
+    // handed out).
     static void AddTemplateClassKit(Player* player)
     {
+        AddTemplateProficiencies(player);
+
         if (player->getClass() == CLASS_SHAMAN)
         {
             for (uint32 totem : SHAMAN_TOTEMS)
@@ -843,6 +846,36 @@ private:
         }
         if (!player->CreatePet(entry, SPELL_TAME_BEAST_EFFECT))
             LOG_ERROR("module", "The core refused a pet of {} for template character {}.", entry, player->GetGUID().ToString());
+    }
+
+    // A character raised straight to 80 never trained a proficiency its trainer
+    // teaches later (Mail for a shaman or hunter at 40, Fist Weapons from a
+    // weapon master). The template equips such items anyway, but at the next
+    // login the core mails every item it cannot use away (_LoadInventory,
+    // EQUIP_ERR_NO_REQUIRED_PROFICIENCY). Learns the proficiency spell of each
+    // worn item's skill that the character's race and class may learn.
+    static void AddTemplateProficiencies(Player* player)
+    {
+        for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+        {
+            Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+            if (!item || player->CanUseItem(item->GetTemplate()) != EQUIP_ERR_NO_REQUIRED_PROFICIENCY)
+                continue;
+
+            for (SkillLineAbilityEntry const* ability : GetSkillLineAbilitiesBySkillLine(item->GetTemplate()->GetSkill()))
+            {
+                if ((ability->RaceMask && !(ability->RaceMask & player->getRaceMask())) ||
+                    (ability->ClassMask && !(ability->ClassMask & player->getClassMask())))
+                    continue;
+
+                SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(ability->Spell);
+                if (!spellInfo || !spellInfo->HasEffect(SPELL_EFFECT_PROFICIENCY) || player->HasSpell(ability->Spell))
+                    continue;
+
+                player->learnSpell(ability->Spell);
+                LOG_DEBUG("module", "Template character {} learned proficiency {} for item {}.", player->GetGUID().ToString(), ability->Spell, item->GetEntry());
+            }
+        }
     }
 
     // mod-paragon-itemgen's Paragon enchantments on every worn item, all of
