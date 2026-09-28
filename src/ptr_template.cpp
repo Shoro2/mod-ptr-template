@@ -322,14 +322,8 @@ private:
             std::list<Item*> excessiveItems;
 
             do
-            {   //                                                           0
-                QueryResult containerInfo = CharacterDatabase.Query("SELECT slot FROM character_inventory WHERE (bag = 0 AND guid = {})", (player->GetGUID().GetCounter()));
-
-                if (!containerInfo) // Apparently this can happen sometimes.
-                    continue;
-
+            {
                 Field* bagFields = bagInfo->Fetch();
-                Field* containerFields = containerInfo->Fetch();
                 uint32 bagEntry = bagFields[0].Get<uint32>();
                 uint8 slotEntry = bagFields[1].Get<uint8>();
                 uint32 itemEntry = bagFields[2].Get<uint32>();
@@ -345,38 +339,29 @@ private:
 
                 ItemPosCountVec dest;
                 if (bagEntry > CONTAINER_BACKPACK && bagEntry < CONTAINER_FINISH) // If bag is an equipped container.
-                { // TODO: Make this whole section better.
-                    do // Also TODO: Add support for adding to bank bag contents. Damn paladins.
+                { // TODO: Add support for adding to bank bag contents. Damn paladins.
+                    // The template's bag n sits in inventory slot INVENTORY_SLOT_BAG_START + n - 1.
+                    // Read from memory: this step used to ask the DB, where the gear step's rows
+                    // may still be on their way - with several templates at once every bag row
+                    // was skipped ("apparently this can happen sometimes").
+                    uint8 const bagSlot = static_cast<uint8>(INVENTORY_SLOT_BAG_START + bagEntry - 1);
+                    if (!player->GetBagByPos(bagSlot))
+                        continue;
+
+                    uint8 validCheck = player->CanStoreNewItem(bagSlot, slotEntry, dest, itemEntry, quantityEntry);
+                    if (validCheck == EQUIP_ERR_OK)
                     {
-                        if (!containerFields) // Apparently this can happen sometimes.
+                        player->StoreNewItem(dest, itemEntry, true);
+                        Item* item = player->GetUseableItemByPos(bagSlot, slotEntry);
+                        player->SendNewItem(item, 1, false, true); // Broadcast item detail packet.
+                        if (item && item->GetEntry() != itemEntry)
                             continue;
 
-                        uint8 slotDBInfo = containerFields[0].Get<uint8>();
-
-                        if (bagEntry != (slotDBInfo - 18)) // Check if equipped bag matches specified bag for module.
-                            continue;
-
-                        if (slotDBInfo < INVENTORY_SLOT_BAG_START || slotDBInfo >= INVENTORY_SLOT_ITEM_START)
-                            continue; // Ignore any non-container slots (i.e. backpack gear, equipped gear)
-
-                        uint8 validCheck = player->CanStoreNewItem(slotDBInfo, slotEntry, dest, itemEntry, quantityEntry);
-                        if (validCheck == EQUIP_ERR_OK)
-                        {
-                            player->StoreNewItem(dest, itemEntry, true);
-                            Item* item = player->GetUseableItemByPos(slotDBInfo, slotEntry);
-                            player->SendNewItem(item, 1, false, true); // Broadcast item detail packet.
-                            if (item && item->GetEntry() != itemEntry)
-                                continue;
-
-                            TemplateHelperItemEnchants(bagInfo, player, item, 4);
-                        }
-                    } while (containerInfo->NextRow());
+                        TemplateHelperItemEnchants(bagInfo, player, item, 4);
+                    }
                 }
                 else if (bagEntry == CONTAINER_BACKPACK)
                 {
-                    if (!containerFields) // Apparently this can happen sometimes.
-                        continue;
-
                     if (slotEntry < INVENTORY_SLOT_BAG_END || slotEntry >= PLAYER_SLOT_END)
                         continue; // Ignore any equipped items or invalid slot items.
 
@@ -814,10 +799,15 @@ private:
         if (player->getClass() != CLASS_HUNTER)
             return;
 
+        // The ammo slot keeps what the character had before (a new hunter's
+        // starting bullets): it has to fit the template's ranged weapon and
+        // be in the bags.
         Item* ranged = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_RANGED);
-        if (ranged && ranged->GetTemplate()->AmmoType && !player->GetUInt32Value(PLAYER_AMMO_ID))
+        uint32 const ammoType = ranged ? ranged->GetTemplate()->AmmoType : 0;
+        uint32 const ammo = player->GetUInt32Value(PLAYER_AMMO_ID);
+        ItemTemplate const* ammoProto = ammo ? sObjectMgr->GetItemTemplate(ammo) : nullptr;
+        if (ammoType && !(ammoProto && ammoProto->SubClass == ammoType && player->HasItemCount(ammo, 1)))
         {
-            uint32 const ammoType = ranged->GetTemplate()->AmmoType;
             bool found = false;
             auto consider = [&](Item* item)
             {
