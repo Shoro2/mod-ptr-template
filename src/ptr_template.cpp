@@ -326,7 +326,7 @@ private:
                 Field* bagFields = bagInfo->Fetch();
                 uint32 bagEntry = bagFields[0].Get<uint32>();
                 uint8 slotEntry = bagFields[1].Get<uint8>();
-                uint32 itemEntry = bagFields[2].Get<uint32>();
+                uint32 itemEntry = TemplateFactionItem(player, bagFields[2].Get<uint32>());
                 uint32 quantityEntry = bagFields[3].Get<uint32>();
 
                 if (itemEntry == ITEM_GOLD)
@@ -950,6 +950,32 @@ private:
         }
     }
 
+    // A template names one faction's version of a faction-bound item for every race
+    // (the P4 templates: Solace of the Fallen, Sylvanas' Cunning ...). The other
+    // team's character gets its own version from player_factionchange_items - the
+    // named one would be equipped now and refused at the next login
+    // (EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM), then mailed away.
+    static uint32 TemplateFactionItem(Player* player, uint32 itemEntry)
+    {
+        ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemEntry);
+        if (!proto)
+            return itemEntry;
+
+        if (player->GetTeamId(true) == TEAM_ALLIANCE && proto->HasFlag2(ITEM_FLAG2_FACTION_HORDE))
+        {
+            for (auto const& [alliance, horde] : sObjectMgr->FactionChangeItems)
+                if (horde == itemEntry)
+                    return alliance;
+        }
+        else if (player->GetTeamId(true) == TEAM_HORDE && proto->HasFlag2(ITEM_FLAG2_FACTION_ALLIANCE))
+        {
+            auto const itr = sObjectMgr->FactionChangeItems.find(itemEntry);
+            if (itr != sObjectMgr->FactionChangeItems.end())
+                return itr->second;
+        }
+        return itemEntry;
+    }
+
     static void AddTemplateWornGear(Player* player, uint32 index) // Handles paper doll items and equipped bags.
     { //                                                     0      1       2        3         4         5         6         7         8         9
         QueryResult gearInfo = WorldDatabase.Query("SELECT BagID, SlotID, ItemID, Enchant0, Enchant1, Enchant2, Enchant3, Enchant4, Enchant5, Enchant6 FROM mod_ptrtemplate_inventory WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
@@ -959,7 +985,7 @@ private:
             {
                 uint32 bagEntry = (*gearInfo)[0].Get<uint32>();
                 uint8 slotEntry = (*gearInfo)[1].Get<uint8>();
-                uint32 itemEntry = (*gearInfo)[2].Get<uint32>();
+                uint32 itemEntry = TemplateFactionItem(player, (*gearInfo)[2].Get<uint32>());
 
                 if ((slotEntry >= INVENTORY_SLOT_BAG_END && slotEntry < BANK_SLOT_BAG_START) || (slotEntry >= BANK_SLOT_BAG_END && slotEntry < PLAYER_SLOT_END) || bagEntry != CONTAINER_BACKPACK) // If item is not either an equipped armorpiece, weapon, or container.
                     continue;
