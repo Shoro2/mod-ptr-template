@@ -1,0 +1,11 @@
+# Log (newest first)
+
+- 2026-09-28 fix(Core): Give each faction its own version of template items (d7a653b)
+- 2026-09-28 fix(Core): Check a template's gear the way the login does (add8eff)
+- 2026-09-28 fix(Core): Teach the proficiencies a template's gear needs (96e8566)
+- 2026-09-28 fix(Core): Read equipped bags from memory in the bag step (a7901ec)
+- 2026-09-28 feat(Core): Add the Forgotten Land template kit (04ce9e8)
+- 2026-09-20 fix(sql): guard the ClassMask widening so a fresh world DB boots (b487d83)
+- 2026-09-20 fix(sql): widen RaceMask/ClassMask to INT so classes 12-32 fit (84c1bba)
+- 2026-07-16 feat(ptr-template): WotLK P4 ICC-25HC BiS templates (32 specs) + talents/glyphs/reputation + class-filtered list (f8b99fc)
+- 2026-07-13 Initial import: mod-ptr-template (FL local copy) (d1b2630)
