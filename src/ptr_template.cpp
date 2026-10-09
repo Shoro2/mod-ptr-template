@@ -44,8 +44,19 @@ public:
         if (sConfigMgr->GetOption<bool>("DeleteItems", true))
             itemRoutine = METHOD_DELETE;
 
-        scheduler.Schedule(Milliseconds(delayMultiplier * APPLY_DELAY), [player, index, itemRoutine](TaskContext context)
+        // FL: the task runs about twenty steps after this call returns, and the character may log out
+        // in between - keep its GUID and look it up on every step instead of holding a raw Player*.
+        ObjectGuid const guid = player->GetGUID();
+
+        scheduler.Schedule(Milliseconds(delayMultiplier * APPLY_DELAY), [guid, index, itemRoutine](TaskContext context)
             {
+                Player* player = ObjectAccessor::FindConnectedPlayer(guid);
+                if (!player)
+                {
+                    LOG_DEBUG("module", "Template {} for character {} stopped: the character is no longer online.", index, guid.ToString());
+                    return;
+                }
+
                 switch (context.GetRepeatCounter())
                 {
                 case 0:
@@ -227,7 +238,9 @@ public:
             });
     }
 
-    static uint8 CheckTemplateQualifier(Player* player, uint32 index, uint8 enable)
+    // `security` is the account level of whoever applies the template (the command's invoker), not
+    // the target's: a player must not pass the check by naming a GameMaster's character.
+    static uint8 CheckTemplateQualifier(Player* player, uint32 index, uint8 enable, uint8 security)
     {
         uint32 raceMask = player->getRaceMask();
         uint32 classMask = player->getClassMask();
@@ -262,7 +275,6 @@ public:
             index, raceMask, classMask,
             index, raceMask, classMask);
 
-        uint8 security = player->GetSession()->GetSecurity();
         if ((security < sConfigMgr->GetOption<int8>("EnableApplySecurity", true)) && (security < sConfigMgr->GetOption<int8>("DisableApplySecurity", true)))
         {
             LOG_DEBUG("module", "Player {} tried to apply template {}, but does not meet security level.", player->GetGUID().ToString(), index);
@@ -1293,9 +1305,24 @@ public:
             if (!player)
                 player = PlayerIdentifier::FromTargetOrSelf(handler);
 
-            Player* target = player->GetConnectedPlayer();
+            // FL: a named character that is offline has no Player; the qualifier and the apply task need one.
+            Player* target = player ? player->GetConnectedPlayer() : nullptr;
+            if (!target)
+            {
+                handler->SendErrorMessage(LANG_PLAYER_NOT_FOUND);
+                return false;
+            }
 
-            switch(templatevar.CheckTemplateQualifier(target, index, enable))
+            // FL: the rights are the invoker's; applying a template to another character needs a GameMaster.
+            WorldSession* session = handler->GetSession();
+            uint8 const security = session ? uint8(session->GetSecurity()) : uint8(SEC_CONSOLE);
+            if (session && target != session->GetPlayer() && security < SEC_GAMEMASTER)
+            {
+                handler->SendErrorMessage(LANG_YOURS_SECURITY_IS_LOW);
+                return false;
+            }
+
+            switch(templatevar.CheckTemplateQualifier(target, index, enable, security))
             {
                 case MISSING_TEMPLATE_INFO:
                     handler->PSendModuleSysMessage(module_string, ERROR_TEMPLATE_INFO);

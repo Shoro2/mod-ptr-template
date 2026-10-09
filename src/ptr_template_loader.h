@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "DBCStores.h"
 #include "ForgottenTalentsService.h"
+#include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "ParagonItemGen.h"
 #include "ParagonUtils.h"
