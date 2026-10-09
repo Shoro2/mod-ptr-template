@@ -1,0 +1,36 @@
+name    mod-ptr-template: .template apply targets and rights
+# The command's target rules (fix of 2026-10-09):
+#   1. a player naming a character that is offline gets "Player not found!"
+#   2. a player naming another online character gets "low security level" (the rights are the invoker's)
+#   3. the director (an administrator session) still applies a template to another character
+#   4. a relog while the template's steps run leaves the server running (the task looks the character up)
+# Own slots 12 and 13 (template 3 changes their gear; no other scenario uses them). The offline
+# character is Tbwarg, slot 7's warrior, which this scenario never logs in.
+timeout 120s
+
+bot p warrior slot=12
+bot q warrior slot=13
+
+place 1 16226.2 16257.0 13.2
+require gm alive
+require p alive
+require q alive
+
+as p .template apply Tbwarg 3
+expect output has "Player not found!"
+
+as p .template apply Tbwarm 3
+expect output has "You have low security level for this."
+
+as gm .template apply Tbwarm 3
+expect output lacks "Player not found!"
+expect output lacks "You have low security level for this."
+do q relog
+waitfor q exists timeout 30s
+wait 2s
+require gm alive
+require p alive
+expect q alive
+
+cleanup
+log ptr template guard done

@@ -1,5 +1,7 @@
 # Log (newest first)
 
+- 2026-10-09 test(Command): Bot scenario for the .template apply rules (tests/ptr_template_apply_guard.tbs)
+- 2026-10-09 fix(Command): Guard .template apply and its apply task (online target, the invoker's rights, the task looks the character up each step)
 - 2026-09-28 fix(Core): Give each faction its own version of template items (d7a653b)
 - 2026-09-28 fix(Core): Check a template's gear the way the login does (add8eff)
 - 2026-09-28 fix(Core): Teach the proficiencies a template's gear needs (96e8566)

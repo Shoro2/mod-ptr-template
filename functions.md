@@ -16,14 +16,14 @@ Loader: `Addmod_ptr_templateScripts()` -> `Add_ptr_template()` + `AddSC_ptr_temp
 
 | Command | Security (code / `command` row) | Handler |
 |---|---|---|
-| `.template apply [player] <index>` | `SEC_PLAYER` / 0, not from the console | `applyTemplate(ChatHandler*, Optional<PlayerIdentifier>, uint32 index)`: the named player, else the selected player, else the invoker; then `CheckTemplateQualifier` and `HandleApply` |
+| `.template apply [player] <index>` | `SEC_PLAYER` / 0, not from the console | `applyTemplate(ChatHandler*, Optional<PlayerIdentifier>, uint32 index)`: the named player, else the selected player, else the invoker. The target must be online ("Player not found!" otherwise), and another character than the invoker's own needs a GameMaster ("You have low security level for this.", FL 2026-10-09); then `CheckTemplateQualifier` with the invoker's account level and `HandleApply` |
 | `.template list` | `SEC_PLAYER` / 0, console too | `listTemplate`: enabled templates from `EnableListSecurity`, disabled ones from `DisableListSecurity`, the status text from `StatusSecurityText`; with `ListFilterByClass` a player sees only templates whose inventory rows match their class |
 | `.template enable <index>` / `disable <index>` | `SEC_ADMINISTRATOR` / 3, console too | `UPDATE mod_ptrtemplate_index SET Enable = 1 / 0` |
 
-## Qualification (`CheckTemplateQualifier(Player*, uint32 index, uint8 enable)`)
+## Qualification (`CheckTemplateQualifier(Player*, uint32 index, uint8 enable, uint8 security)`)
 
 In this order, each with its own `module_string` answer:
-1. Security: below both `EnableApplySecurity` and `DisableApplySecurity` ->
+1. Security (`security` = the invoker's account level): below both `EnableApplySecurity` and `DisableApplySecurity` ->
    `INSUFFICIENT_SECURITY_LEVEL`.
 2. A disabled template below `DisableApplySecurity` -> `TEMPLATE_DISABLED_LOCAL`.
 3. No row for the index with the character's race and class bits in any of the nine masked tables ->
