@@ -1,6 +1,6 @@
 # Todo
 
-- (high) Harden `.template apply` and its apply task: tracked in the private vault queue (share-public `docs/World of Warcraft/12-server-todo.md`); not described here because this repository is public.
+- (high) Host: ship the `.template apply` rules of 2026-10-09 (`5651edd`) with HOST11 (vault MIG-111).
 - (medium) Templates for the CoA classes 12-32: masks fit since 2026-09-20, but no rows exist and
   `.template list` answers "no template info" (vault `12-server-todo.md` §2 row "Our modules' class limits
   for ids 12-32").

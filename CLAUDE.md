@@ -37,10 +37,13 @@ bot is ready to play at once. On the host only GMs may apply templates. Full des
   - FL template kit (2026-09-28): talent-ability trainer ranks, Paragon floor 200, hunter ammo and pet,
     shaman totems, missing gear proficiencies, all-cursed Paragon rolls, Remnants at 75 % of the tree's
     price, each faction's own version of faction-bound items, the bag step read from memory.
+  - `.template apply` (2026-10-09): only an online target; another character than the invoker's own needs a
+    GameMaster; the rights check uses the invoker's account; the apply task looks the character up on every
+    step. Bot scenario `tests/ptr_template_apply_guard.tbs`.
 
 ## Next steps
 
-1. Harden `.template apply` and its apply task (high): tracked in the private vault queue (share-public `docs/World of Warcraft/12-server-todo.md`); not described here because this repository is public.
+1. Host: the `.template apply` target and rights rules of 2026-10-09 (`5651edd`, T1 on the workbench: bot run 575 of `tests/ptr_template_apply_guard.tbs`) reach the host with HOST11 (vault MIG-111).
 2. Templates for the CoA classes 12-32: the masks fit them, but no rows exist (`.template list` answers
    "no template info"; vault `12-server-todo.md` §2 row "Our modules' class limits for ids 12-32").
 3. Decide what a fresh database should get from `template-blizzlike.sql` (templates 1, 2, 6 that the
