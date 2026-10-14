@@ -8,6 +8,7 @@
 #include "ParagonItemGen.h"
 #include "ParagonUtils.h"
 #include "Player.h"
+#include "RaceMgr.h"
 #include "ReputationMgr.h"
 #include "ScriptMgr.h"
 #include "SpellInfo.h"

@@ -432,7 +432,13 @@ private:
         int STARTER_QUESTS[33] = { 12593, 12619, 12842, 12848, 12636, 12641, 12657, 12678, 12679, 12680, 12687, 12698, 12701, 12706, 12716, 12719, 12720, 12722, 12724, 12725, 12727, 12733, -1, 12751, 12754, 12755, 12756, 12757, 12779, 12801, 13165, 13166 };
         // Blizz just dumped all of the special surprise quests on every DK template. Don't know yet if I want to do the same.
         int specialSurpriseQuestId = -1;
-        switch (player->getRace())
+
+        // Races without a surprise quest of their own (Goblin, Worgen) use their donor race's (core config Races.Donors).
+        uint32 surpriseRace = player->getRace();
+        if (uint32 donorRace = sRaceMgr->GetDonorRace(surpriseRace))
+            surpriseRace = donorRace;
+
+        switch (surpriseRace)
         {
         case RACE_TAUREN:
             specialSurpriseQuestId = 12739;
@@ -473,10 +479,15 @@ private:
 
         for (int questId : STARTER_QUESTS)
         {
+            // -1 = the race has no surprise quest. A null template would crash AddQuest, so skip ids missing from quest_template too.
+            Quest const* quest = questId > 0 ? sObjectMgr->GetQuestTemplate(questId) : nullptr;
+            if (!quest)
+                continue;
+
             if (player->GetQuestStatus(questId) == QUEST_STATUS_NONE)
             {
-                player->AddQuest(sObjectMgr->GetQuestTemplate(questId), nullptr);
-                player->RewardQuest(sObjectMgr->GetQuestTemplate(questId), 0, player, false);
+                player->AddQuest(quest, nullptr);
+                player->RewardQuest(quest, 0, player, false);
             }
             if (player->GetItemByPos(INVENTORY_SLOT_BAG_0, INVENTORY_SLOT_ITEM_START))
             {
