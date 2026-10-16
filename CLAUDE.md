@@ -16,7 +16,7 @@ bot is ready to play at once. On the host only GMs may apply templates. Full des
 | World table (FL) | `mod_ptrtemplate_profile`: role, main stat and spec per template 20-51 for the cursed Paragon rolls |
 | Other world rows | `command` `template apply` / `list` (security 0), `template enable` / `disable` (3); `module_string` module `ptr-template` 0-19 (+ `module_string_locale`); `mailtemplate_dbc` 344, 403 |
 | Commands | `.template apply [player] <index>`, `.template list`, `.template enable <index>`, `.template disable <index>` |
-| C++ scripts | `createPTR`, `schedulediff` (WorldScripts), `createTemplate`, `announce` (PlayerScripts), `ptr_template_commandscript` |
+| C++ scripts | `createPTR`, `schedulediff` (WorldScripts), `announce` (PlayerScript), `ptr_template_commandscript`; `createTemplate` is a plain helper class (no script, since 2026-10-17: as a PlayerScript its function-local statics crashed every worldserver stop after a login) |
 | Kit links | mod-paragon (`SetParagonLevelAtLeast`, `GetParagonLevel`), mod-paragon-itemgen (`ParagonItemGenSetProfile`, `ParagonItemGenRollCursed`), mod-forgotten-talents (`Service::FullTreeCost`, Remnants 920105-920109); hunter pet creature 26672, shaman totems 5175-5178 |
 | Config | `mod_ptr_template.conf` |
 | Used by | mod-fl-testbots: `template=<index>` on a bot (vault `testing/01-test-bots.md`) |

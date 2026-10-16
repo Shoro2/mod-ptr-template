@@ -6,7 +6,7 @@
 |---|---|---|
 | `createPTR` | `WorldScript`, `OnBeforeWorldInitialized()` | counts `mod_ptrtemplate_index` and logs `>> Loaded <n> templates in <ms> ms.` |
 | `schedulediff` | `WorldScript`, `OnUpdate(uint32 diff)` | drives the global `TaskScheduler scheduler` that runs the apply steps |
-| `createTemplate` | `PlayerScript` (no hook; a holder) | `HandleApply`, `CheckTemplateQualifier` and the `AddTemplate*` steps |
+| `createTemplate` | plain helper class, all methods static (was a hookless PlayerScript until 2026-10-17; its function-local statics registered in ScriptMgr and crashed the stop) | `HandleApply`, `CheckTemplateQualifier` and the `AddTemplate*` steps |
 | `announce` | `PlayerScript`, `OnPlayerLogin(Player*)` | the module message (`AnnounceEnable`); on a first login (`AT_LOGIN_FIRST`) applies `LoginTemplateIndex` when it is not 0 |
 | `ptr_template_commandscript` | `CommandScript` | the `.template` commands |
 

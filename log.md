@@ -1,5 +1,6 @@
 # Log (newest first)
 
+- 2026-10-17 fix(Core): createTemplate is a plain helper, not a PlayerScript - its function-local statics registered on the first login and ScriptMgr::Unload deleted them at exit (host segfault at the HOST11/12/13 stops; MIG-160)
 - 2026-10-09 test(Command): Bot scenario for the .template apply rules (b766f09)
 - 2026-10-09 fix(Command): Guard .template apply and its apply task (5651edd)
 - 2026-09-28 fix(Core): Give each faction its own version of template items (d7a653b)
