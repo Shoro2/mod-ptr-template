@@ -1,9 +1,8 @@
 # Todo
 
-- (high) Host: ship the `.template apply` rules of 2026-10-09 (`5651edd`) with HOST11 (vault MIG-111).
 - (high) Host: the race and CoA template fit of 2026-10-17 rides the Chronicle host window (vault MIG-164).
-- (low) Own CoA templates: CoA classes borrow stock templates by armor type since 2026-10-17 (Reaper and
-  Wildwalker: the agility mail templates). Own CoA lists would be a generated per-role kit (operator to decide).
+- (low) Own CoA templates: CoA classes borrow the stock templates of their armor type that CoA's item rules
+  let them wear since 2026-10-17. Own CoA lists would be a generated per-role kit (operator to decide).
 - (low) Template 3's race masks are the stock race/class pairs (druid spells only Night Elf and Tauren); a
   pair FL opened later (a Human druid, a Goblin mage) gets template 3's gear but not its class spells.
 - (low) `data/sql/db-world/template-blizzlike.sql` still inserts templates 1, 2, 3 and 6 (2 and 3 enabled).

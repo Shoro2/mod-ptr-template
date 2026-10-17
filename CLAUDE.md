@@ -40,15 +40,18 @@ bot is ready to play at once. On the host only GMs may apply templates. Full des
   - `.template apply` (2026-10-09): only an online target; another character than the invoker's own needs a
     GameMaster; the rights check uses the invoker's account; the apply task looks the character up on every
     step. Bot scenario `tests/ptr_template_apply_guard.tbs`.
+  - Template fit (2026-10-17, `TemplateFit` in `ptr_template.cpp`): Worgen and Goblins read their donor
+    race's rows (they got "does not apply" before); a CoA class borrows the gear (no spells, talents,
+    glyphs or bars) of the stock templates of its best armor type whose chest piece CoA lets it wear,
+    else the next lower armor type. Workbench T1: bot run 867 of `tests/ptr_template_races_coa.tbs` PASSED
+    53/0. Host: vault MIG-164 (Chronicle host window).
 
 ## Next steps
 
-1. Host: the `.template apply` target and rights rules of 2026-10-09 (`5651edd`, T1 on the workbench: bot run 575 of `tests/ptr_template_apply_guard.tbs`) reach the host with HOST11 (vault MIG-111).
-2. Templates for the CoA classes 12-32: the masks fit them, but no rows exist (`.template list` answers
-   "no template info"; vault `12-server-todo.md` §2 row "Our modules' class limits for ids 12-32").
-3. Decide what a fresh database should get from `template-blizzlike.sql` (templates 1, 2, 6 that the
+1. Host: the template fit of 2026-10-17 rides the Chronicle host window (vault MIG-164); T2 by players.
+2. Decide what a fresh database should get from `template-blizzlike.sql` (templates 1, 2, 6 that the
    workbench does not hold; todo, low).
-4. The inherited upstream CI cannot build the kit's FL includes (todo, low).
+3. The inherited upstream CI cannot build the kit's FL includes (todo, low).
 
 Open points in full: [todo.md](todo.md).
 

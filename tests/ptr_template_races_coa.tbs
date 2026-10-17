@@ -5,17 +5,17 @@ name    mod-ptr-template: Worgen, Goblins and CoA classes
 #      whole template: gear, talents, level
 #   2. a CoA class lists and wears the templates of the stock classes with its best armor type
 #      (plate: warrior, paladin, death knight; mail: hunter, shaman; leather: rogue, druid;
-#      cloth: priest, mage, warlock), keeps its own spells and talents, and gets no piece it can
-#      never wear (a weapon type its class is not trained in is left out)
-#   3. a CoA class whose armor type has no template with its main stat (Reaper: agility, plate)
-#      borrows the agility templates of the best armor type below that has them (mail: hunter,
-#      Enhancement shaman)
+#      cloth: priest, mage, warlock) whose chest piece CoA lets it wear (armor type and major stat),
+#      keeps its own spells and talents, and gets no piece it can never wear (a weapon type its
+#      class has no skill for is left out)
+#   3. Reaper (plate, strength in CoA's item rules) keeps the strength plate templates
 #   4. the generic template 3 (gear for every class) lends a CoA class nothing
-# Own slots 12-14 and 18-21, each with a race/class pair no other scenario uses.
+# Slots 12, 14, 15 and 18-21, each with a race/class pair no other scenario uses (slot 13 refuses the
+# goblin mage's name Tbgomagm at creation).
 timeout 240s
 
 bot wd druid race=worgen slot=12
-bot gm2 mage race=goblin slot=13
+bot gm2 mage race=goblin slot=15
 bot kx knightofxoroth slot=14
 bot wh witchhunter slot=18
 bot bb barbarian slot=19
@@ -40,7 +40,7 @@ as gm2 .template apply 31
 expect output lacks "does not apply"
 waitfor gm2 worn 51281 timeout 30s
 expect gm2 worn 50732
-expect gm2 hasspell 11069
+expect gm2 hasspell 12042
 
 # 2. CoA classes: plate (Knight of Xoroth -> Warrior Arms 49)
 as kx .template list
@@ -60,28 +60,28 @@ waitfor kx worn 51227 timeout 30s
 expect kx worn 51225
 expect kx nospell 12294
 
-# mail (Witch Hunter -> Hunter Beast Mastery 28): bow yes, polearm left out (no Polearms)
+# mail (Witch Hunter -> Hunter Beast Mastery 28): bow and polearm left out (no Bows, no Polearms)
 as wh .template list
 expect output has "Hunter - Beast Mastery"
 expect output has "Shaman - Elemental"
 expect output lacks "Warrior"
 as wh .template apply 28
 waitfor wh worn 51286 timeout 30s
-expect wh worn 50638
+expect wh item 50638 == 0
 expect wh item 50735 == 0
 expect wh nospell 19431
 
-# leather (Barbarian -> Rogue Assassination 40): daggers left out (no Daggers)
+# leather (Barbarian -> Rogue Assassination 40): its daggers are worn (the Barbarian has Daggers)
 as bb .template list
 expect output has "Rogue - Assassination"
 expect output has "Druid - Feral DPS"
 expect output lacks "Hunter"
 as bb .template apply 40
 waitfor bb worn 51252 timeout 30s
-expect bb item 50736 == 0
+expect bb worn 50736
 expect bb nospell 1329
 
-# cloth (Pyromancer -> Warlock Affliction 46): wand yes, one-handed sword left out (no Swords)
+# cloth (Pyromancer -> Warlock Affliction 46): wand and one-handed sword worn
 as py .template list
 expect output has "Warlock - Affliction"
 expect output has "Priest - Shadow"
@@ -89,22 +89,20 @@ expect output lacks "Rogue"
 as py .template apply 46
 waitfor py worn 51231 timeout 30s
 expect py worn 50684
-expect py item 50732 == 0
+expect py worn 50732
 expect py nospell 17780
 
-# Reaper: plate, agility -> the agility mail templates
+# Reaper: plate, strength -> the strength plate templates, no agility mail
 as rp .template list
-expect output has "Hunter - Beast Mastery"
-expect output has "Shaman - Enhancement"
-expect output lacks "Shaman - Elemental"
-expect output lacks "Warrior"
-expect output lacks "Paladin"
-as rp .template apply 43
+expect output has "Warrior - Arms"
+expect output has "Death Knight - Frost DPS"
+expect output lacks "Hunter"
+expect output lacks "Shaman"
+as rp .template apply 28
 expect output has "does not apply"
-as rp .template apply 29
-waitfor rp worn 51286 timeout 30s
-expect rp worn 50735
-expect rp item 50733 == 0
+as rp .template apply 50
+waitfor rp worn 51227 timeout 30s
+expect rp worn 51225
 
 wait 3s
 require wd alive

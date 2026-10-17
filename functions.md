@@ -19,10 +19,9 @@ Every masked query (the qualifier, the steps, the list) reads with `TemplateFit:
 |---|---|
 | `RaceMask(Player*)` | the character's race bit plus its donor race's bit (`sRaceMgr->GetDonorRace`, worldserver.conf `Races.Donors`: Goblin 9 -> Orc 2, Worgen 12 -> Human 1). The template rows carry stock race masks only (the P4 rows 1791) |
 | `IsBorrowed(Player*)` | the character is a CoA class (12-32, `IsAscensionClass`): it borrows another class's template |
-| `Load()` | armor tier per class: the stock classes fixed (plate warrior / paladin / death knight, mail hunter / shaman, leather rogue / druid, cloth priest / mage / warlock); a CoA class the best armor proficiency spell it is created with in `playercreateinfo_spell_custom` (750 plate, 8737 mail, 9077 leather, 9078 cloth; none = cloth) |
-| `Load()` (stat fit) | when no template of a CoA class's tier has its main stat (`ascension_custom_class.primary_stat` against `mod_ptrtemplate_profile.MainStat`), the class moves to the best lower tier that has one and borrows only templates with that stat (the operator, 2026-10-17: Reaper and Wildwalker, agility on plate, get the agility mail templates: hunter and Enhancement shaman). Spirit (Chronomancer) matches no template and keeps its tier unfiltered |
-| `ArmorGroupMask(classId)` | the stock classes with that class's (stat-fitted) tier |
-| `ClassMask(Player*, index)` | a stock class: its own mask. A CoA class: the one stock class of its armor group that the template's inventory rows are for; 0 (the template does not apply) when none or several (the generic template 3), or when the class is stat-filtered and the template's profile has another main stat |
+| `Load()` | armor tier per class: the stock classes fixed (plate warrior / paladin / death knight, mail hunter / shaman, leather rogue / druid, cloth priest / mage / warlock); a CoA class the best armor proficiency spell it is created with in `playercreateinfo_spell_custom` (750 plate, 8737 mail, 9077 leather, 9078 cloth; none = cloth). Logs `>> Template armor types of the CoA classes: 12=leather ...` |
+| `Resolve(classId)` | at a CoA class's first use (CoA narrows the item masks in `OnBeforeWorldInitialized` too, in no fixed order): the templates of its tier with a single lending stock class (not the generic template 3) whose chest piece (`BagID 0`, `SlotID 4`) has the class in its in-memory `AllowableClass` - CoA's narrowing by armor type and major stat (operator 2026-10-04 / 2026-10-17 "die richtigen stats"). None: the next lower tier ("armor type der beste der geht"). Logs `Template fit of class <n> (<tier>): <tier> templates <ids>` |
+| `ClassMask(Player*, index)` | a stock class: its own mask. A CoA class: the lending class's mask for a resolved template, else 0 (the template does not apply) |
 
 A borrowed template applies level, taxi, homebind, achievements, quests, reputations, Paragon floor, gear,
 bag items, Paragon rolls (the lender's profile row), Remnants, position and resources. Skipped: spells (8),
@@ -31,6 +30,8 @@ already has, plus secondary skills and professions. Gear (12): a paper-doll piec
 `CanUseItem(ItemTemplate*)` is OK and its skill is one the character holds (`CanWearBorrowedItem`); the
 rest is left out with one chat line, because CoA keeps each class's proficiency set and the login would
 mail such a piece away. `applyTemplate` tells the invoker first that the template is another class's.
+Measured 2026-10-17 (bot run 867): Knight of Xoroth and Reaper get the ten plate templates, Witch Hunter
+the six mail ones, Barbarian five leather ones (not Balance), Pyromancer the nine cloth ones.
 
 Loader: `Addmod_ptr_templateScripts()` -> `Add_ptr_template()` + `AddSC_ptr_template_commandscript()`.
 

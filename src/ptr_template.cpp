@@ -9,11 +9,11 @@ using namespace Acore::ChatCommands;
 // - a Conquest of Azeroth class (12-32) borrows the gear of a stock class's template, of a class
 //   that wears the same best armor type (the operator, 2026-10-17). A CoA class's armor type is the
 //   best armor proficiency it is created with (playercreateinfo_spell_custom, CoA's world data:
-//   Plate 750, Mail 8737, Leather 9077, Cloth 9078); the stock classes keep theirs.
-//   When no template of that armor type has the class's main stat (ascension_custom_class.primary_stat;
-//   Reaper and Wildwalker: agility, plate), the class borrows from the best armor type below that has
-//   one, and only the templates with its main stat (the operator, 2026-10-17: "armor type der beste
-//   der geht (aber halt mit den richtigen stats)").
+//   Plate 750, Mail 8737, Leather 9077, Cloth 9078); the stock classes keep theirs. Of those, it
+//   gets the templates whose chest piece its class may wear - CoA narrows every item's
+//   AllowableClass to the classes with the item's armor type and major stat ("die richtigen stats",
+//   the operator, 2026-10-17). When it may wear none of them, it takes the best armor type below
+//   that has some ("armor type der beste der geht").
 namespace TemplateFit
 {
     enum ArmorTier : uint8
@@ -26,7 +26,16 @@ namespace TemplateFit
     };
 
     static std::array<uint8, MAX_CLASSES> classArmorTier{};
-    static std::array<uint8, MAX_CLASSES> classStatFilter{}; // a ParagonStatIndex, 0 = every template of the tier
+
+    // A CoA class's borrowable templates (index -> the lending stock class's mask), resolved at the
+    // first use: CoA narrows the item masks at world start, in no fixed order with this module.
+    struct ClassFit
+    {
+        bool resolved = false;
+        uint8 tier = ARMOR_NONE;
+        std::map<uint32, uint32> lenders;
+    };
+    static std::array<ClassFit, MAX_CLASSES> classFit{};
 
     static uint8 StockArmorTier(uint8 classId)
     {
@@ -74,9 +83,22 @@ namespace TemplateFit
         }
     }
 
+    // The stock classes of an armor tier.
+    static uint32 TierClassMask(uint8 tier)
+    {
+        uint32 mask = 0;
+        if (tier != ARMOR_NONE)
+            for (uint8 stockClass = CLASS_WARRIOR; stockClass < CLASS_BARBARIAN; ++stockClass)
+                if (StockArmorTier(stockClass) == tier)
+                    mask |= 1u << (stockClass - 1);
+        return mask;
+    }
+
     static void Load()
     {
         classArmorTier.fill(ARMOR_NONE);
+        for (ClassFit& fit : classFit)
+            fit = ClassFit();
         for (uint8 classId = CLASS_WARRIOR; classId < MAX_CLASSES; ++classId)
             classArmorTier[classId] = StockArmorTier(classId);
 
@@ -93,36 +115,6 @@ namespace TemplateFit
             } while (result->NextRow());
         }
 
-        // The main stats the templates of each armor type offer (mod_ptrtemplate_profile, a bit per ParagonStatIndex).
-        std::array<uint32, ARMOR_PLATE + 1> tierStats{};
-        //                                                  0          1
-        if (QueryResult result = WorldDatabase.Query("SELECT ClassMask, MainStat FROM mod_ptrtemplate_profile"))
-        {
-            do
-            {
-                uint32 const classMask = (*result)[0].Get<uint32>();
-                uint8 const mainStat = (*result)[1].Get<uint8>();
-                for (uint8 stockClass = CLASS_WARRIOR; stockClass < CLASS_BARBARIAN; ++stockClass)
-                    if ((classMask & (1u << (stockClass - 1))) && mainStat < 32)
-                        tierStats[StockArmorTier(stockClass)] |= 1u << mainStat;
-            } while (result->NextRow());
-        }
-
-        // A CoA class's main stat (CoA's own column: Strength, Agility, Intellect, Spirit).
-        classStatFilter.fill(0);
-        std::array<uint8, MAX_CLASSES> classMainStat{};
-        //                                                  0        1
-        if (QueryResult result = WorldDatabase.Query("SELECT class, primary_stat FROM ascension_custom_class"))
-        {
-            do
-            {
-                uint8 const classId = (*result)[0].Get<uint8>();
-                std::string const stat = (*result)[1].Get<std::string>();
-                if (classId < MAX_CLASSES)
-                    classMainStat[classId] = uint8(stat == "Strength" ? PSTAT_STRENGTH : stat == "Agility" ? PSTAT_AGILITY : stat == "Intellect" ? PSTAT_INTELLECT : 0);
-            } while (result->NextRow());
-        }
-
         std::string text;
         for (uint8 classId = CLASS_WARRIOR; classId < MAX_CLASSES; ++classId)
         {
@@ -130,37 +122,68 @@ namespace TemplateFit
                 continue;
             if (classArmorTier[classId] == ARMOR_NONE)
                 classArmorTier[classId] = ARMOR_CLOTH; // every class wears cloth
-
-            uint8 const wears = classArmorTier[classId];
-            uint8 const stat = classMainStat[classId];
-            if (stat && !(tierStats[wears] & (1u << stat)))
-            {
-                for (uint8 tier = uint8(wears - 1); tier >= ARMOR_CLOTH; --tier)
-                {
-                    if (tierStats[tier] & (1u << stat))
-                    {
-                        classArmorTier[classId] = tier;
-                        classStatFilter[classId] = stat;
-                        break;
-                    }
-                }
-            }
-            text += Acore::StringFormat("{}{}={}{}", text.empty() ? "" : " ", classId, ArmorTierName(classArmorTier[classId]),
-                classStatFilter[classId] ? Acore::StringFormat("({} only)", classStatFilter[classId] == PSTAT_STRENGTH ? "strength" : classStatFilter[classId] == PSTAT_AGILITY ? "agility" : "intellect") : "");
+            text += Acore::StringFormat("{}{}={}", text.empty() ? "" : " ", classId, ArmorTierName(classArmorTier[classId]));
         }
         LOG_INFO("module", ">> Template armor types of the CoA classes: {}", text);
     }
 
-    // The stock classes whose templates `classId` may borrow: those of its (stat-fitted) armor type.
-    static uint32 ArmorGroupMask(uint8 classId)
+    // The templates of one armor tier a CoA class may borrow: a single stock class of the tier lends
+    // the template's gear (not the generic template 3, which has gear for every class), and the class
+    // may wear that gear's chest piece (its narrowed AllowableClass).
+    static std::map<uint32, uint32> TierLenders(uint8 classId, uint8 tier)
     {
-        uint8 const tier = classId < MAX_CLASSES ? classArmorTier[classId] : ARMOR_NONE;
-        uint32 mask = 0;
-        if (tier != ARMOR_NONE)
-            for (uint8 stockClass = CLASS_WARRIOR; stockClass < CLASS_BARBARIAN; ++stockClass)
-                if (StockArmorTier(stockClass) == tier)
-                    mask |= 1u << (stockClass - 1);
-        return mask;
+        uint32 const group = TierClassMask(tier);
+        uint32 const classBit = 1u << (classId - 1);
+        std::map<uint32, uint32> lenders;
+        std::map<uint32, uint32> seen; // index -> every lender of the tier with a chest row
+        //                                                  0      1          2
+        if (QueryResult result = WorldDatabase.Query("SELECT ID, ClassMask, ItemID FROM mod_ptrtemplate_inventory WHERE BagID = 0 AND SlotID = {} AND ClassMask & {}", uint32(EQUIPMENT_SLOT_CHEST), group))
+        {
+            do
+            {
+                uint32 const index = (*result)[0].Get<uint32>();
+                uint32 const lender = (*result)[1].Get<uint32>() & group;
+                seen[index] |= lender;
+                ItemTemplate const* chest = sObjectMgr->GetItemTemplate((*result)[2].Get<uint32>());
+                if (chest && (chest->AllowableClass & classBit))
+                    lenders[index] |= lender;
+            } while (result->NextRow());
+        }
+        for (auto itr = lenders.begin(); itr != lenders.end();)
+        {
+            uint32 const all = seen[itr->first];
+            if (all & (all - 1)) // several lenders: the generic template
+                itr = lenders.erase(itr);
+            else
+                ++itr;
+        }
+        return lenders;
+    }
+
+    static ClassFit const& Resolve(uint8 classId)
+    {
+        ClassFit& fit = classFit[classId];
+        if (fit.resolved)
+            return fit;
+
+        fit.resolved = true;
+        for (uint8 tier = classArmorTier[classId]; tier >= ARMOR_CLOTH; --tier)
+        {
+            fit.lenders = TierLenders(classId, tier);
+            if (!fit.lenders.empty())
+            {
+                fit.tier = tier;
+                break;
+            }
+        }
+
+        std::string indexes;
+        for (auto const& [index, lender] : fit.lenders)
+            indexes += Acore::StringFormat("{}{}", indexes.empty() ? "" : " ", index);
+        LOG_INFO("module", "Template fit of class {} ({}): {} templates {}", classId, ArmorTierName(classArmorTier[classId]),
+            fit.tier == classArmorTier[classId] ? ArmorTierName(fit.tier) : Acore::StringFormat("{}, the best armor type it fits", ArmorTierName(fit.tier)),
+            indexes.empty() ? "none" : indexes);
+        return fit;
     }
 
     static uint32 RaceMask(Player* player)
@@ -178,39 +201,16 @@ namespace TemplateFit
         return IsAscensionClass(player->getClass());
     }
 
-    // The class mask the template's rows are read with; 0 when the template has nothing for the character.
-    // A CoA class reads the rows of the one stock class of its armor group that the template's gear
-    // is for. The generic template (gear for every class) names no single class and lends nothing.
+    // The class mask the template's rows are read with; 0 when the template has nothing for the
+    // character. A CoA class reads the rows of the stock class that lends it the template.
     static uint32 ClassMask(Player* player, uint32 index)
     {
         if (!IsBorrowed(player))
             return player->getClassMask();
 
-        uint32 const group = ArmorGroupMask(player->getClass());
-        if (!group)
-            return 0;
-
-        uint32 found = 0;
-        //                                                  0
-        if (QueryResult result = WorldDatabase.Query("SELECT DISTINCT ClassMask FROM mod_ptrtemplate_inventory WHERE ID = {} AND ClassMask & {}", index, group))
-        {
-            do
-            {
-                found |= (*result)[0].Get<uint32>() & group;
-            } while (result->NextRow());
-        }
-        if (!found || (found & (found - 1)))
-            return 0;
-
-        // A class that left its armor type for its main stat borrows only templates with that stat.
-        if (uint8 const stat = classStatFilter[player->getClass()])
-        {
-            //                                                  0
-            QueryResult profile = WorldDatabase.Query("SELECT MainStat FROM mod_ptrtemplate_profile WHERE ID = {} AND ClassMask & {}", index, found);
-            if (!profile || (*profile)[0].Get<uint8>() != stat)
-                return 0;
-        }
-        return found;
+        ClassFit const& fit = Resolve(player->getClass());
+        auto const itr = fit.lenders.find(index);
+        return itr != fit.lenders.end() ? itr->second : 0;
     }
 }
 

@@ -1,6 +1,6 @@
 # Log (newest first)
 
-- 2026-10-17 fix(Core): Templates for donor races and CoA classes - Worgen/Goblins read their donor race's rows; a CoA class borrows the gear of a stock class's template with the same best armor type (13c4173; bot scenario `tests/ptr_template_races_coa.tbs`; vault MIG-164)
+- 2026-10-17 fix(Core): Templates for donor races and CoA classes - Worgen/Goblins read their donor race's rows; a CoA class borrows the gear of a stock class's template with the same best armor type (13c4173, ca2db95; the CoA choice follows CoA's narrowed item masks; bot run 867 `tests/ptr_template_races_coa.tbs` PASSED 53/0; vault MIG-164)
 - 2026-10-17 fix(Core): createTemplate is a plain helper, not a PlayerScript - its function-local statics registered on the first login and ScriptMgr::Unload deleted them at exit (host segfault at the HOST11/12/13 stops; MIG-160)
 - 2026-10-09 test(Command): Bot scenario for the .template apply rules (b766f09)
 - 2026-10-09 fix(Command): Guard .template apply and its apply task (5651edd)
