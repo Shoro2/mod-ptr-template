@@ -10,6 +10,10 @@ using namespace Acore::ChatCommands;
 //   that wears the same best armor type (the operator, 2026-10-17). A CoA class's armor type is the
 //   best armor proficiency it is created with (playercreateinfo_spell_custom, CoA's world data:
 //   Plate 750, Mail 8737, Leather 9077, Cloth 9078); the stock classes keep theirs.
+//   When no template of that armor type has the class's main stat (ascension_custom_class.primary_stat;
+//   Reaper and Wildwalker: agility, plate), the class borrows from the best armor type below that has
+//   one, and only the templates with its main stat (the operator, 2026-10-17: "armor type der beste
+//   der geht (aber halt mit den richtigen stats)").
 namespace TemplateFit
 {
     enum ArmorTier : uint8
@@ -22,6 +26,7 @@ namespace TemplateFit
     };
 
     static std::array<uint8, MAX_CLASSES> classArmorTier{};
+    static std::array<uint8, MAX_CLASSES> classStatFilter{}; // a ParagonStatIndex, 0 = every template of the tier
 
     static uint8 StockArmorTier(uint8 classId)
     {
@@ -88,6 +93,36 @@ namespace TemplateFit
             } while (result->NextRow());
         }
 
+        // The main stats the templates of each armor type offer (mod_ptrtemplate_profile, a bit per ParagonStatIndex).
+        std::array<uint32, ARMOR_PLATE + 1> tierStats{};
+        //                                                  0          1
+        if (QueryResult result = WorldDatabase.Query("SELECT ClassMask, MainStat FROM mod_ptrtemplate_profile"))
+        {
+            do
+            {
+                uint32 const classMask = (*result)[0].Get<uint32>();
+                uint8 const mainStat = (*result)[1].Get<uint8>();
+                for (uint8 stockClass = CLASS_WARRIOR; stockClass < CLASS_BARBARIAN; ++stockClass)
+                    if ((classMask & (1u << (stockClass - 1))) && mainStat < 32)
+                        tierStats[StockArmorTier(stockClass)] |= 1u << mainStat;
+            } while (result->NextRow());
+        }
+
+        // A CoA class's main stat (CoA's own column: Strength, Agility, Intellect, Spirit).
+        classStatFilter.fill(0);
+        std::array<uint8, MAX_CLASSES> classMainStat{};
+        //                                                  0        1
+        if (QueryResult result = WorldDatabase.Query("SELECT class, primary_stat FROM ascension_custom_class"))
+        {
+            do
+            {
+                uint8 const classId = (*result)[0].Get<uint8>();
+                std::string const stat = (*result)[1].Get<std::string>();
+                if (classId < MAX_CLASSES)
+                    classMainStat[classId] = uint8(stat == "Strength" ? PSTAT_STRENGTH : stat == "Agility" ? PSTAT_AGILITY : stat == "Intellect" ? PSTAT_INTELLECT : 0);
+            } while (result->NextRow());
+        }
+
         std::string text;
         for (uint8 classId = CLASS_WARRIOR; classId < MAX_CLASSES; ++classId)
         {
@@ -95,12 +130,28 @@ namespace TemplateFit
                 continue;
             if (classArmorTier[classId] == ARMOR_NONE)
                 classArmorTier[classId] = ARMOR_CLOTH; // every class wears cloth
-            text += Acore::StringFormat("{}{}={}", text.empty() ? "" : " ", classId, ArmorTierName(classArmorTier[classId]));
+
+            uint8 const wears = classArmorTier[classId];
+            uint8 const stat = classMainStat[classId];
+            if (stat && !(tierStats[wears] & (1u << stat)))
+            {
+                for (uint8 tier = uint8(wears - 1); tier >= ARMOR_CLOTH; --tier)
+                {
+                    if (tierStats[tier] & (1u << stat))
+                    {
+                        classArmorTier[classId] = tier;
+                        classStatFilter[classId] = stat;
+                        break;
+                    }
+                }
+            }
+            text += Acore::StringFormat("{}{}={}{}", text.empty() ? "" : " ", classId, ArmorTierName(classArmorTier[classId]),
+                classStatFilter[classId] ? Acore::StringFormat("({} only)", classStatFilter[classId] == PSTAT_STRENGTH ? "strength" : classStatFilter[classId] == PSTAT_AGILITY ? "agility" : "intellect") : "");
         }
         LOG_INFO("module", ">> Template armor types of the CoA classes: {}", text);
     }
 
-    // The stock classes that wear the same best armor type as `classId`.
+    // The stock classes whose templates `classId` may borrow: those of its (stat-fitted) armor type.
     static uint32 ArmorGroupMask(uint8 classId)
     {
         uint8 const tier = classId < MAX_CLASSES ? classArmorTier[classId] : ARMOR_NONE;
@@ -148,7 +199,18 @@ namespace TemplateFit
                 found |= (*result)[0].Get<uint32>() & group;
             } while (result->NextRow());
         }
-        return (found && !(found & (found - 1))) ? found : 0;
+        if (!found || (found & (found - 1)))
+            return 0;
+
+        // A class that left its armor type for its main stat borrows only templates with that stat.
+        if (uint8 const stat = classStatFilter[player->getClass()])
+        {
+            //                                                  0
+            QueryResult profile = WorldDatabase.Query("SELECT MainStat FROM mod_ptrtemplate_profile WHERE ID = {} AND ClassMask & {}", index, found);
+            if (!profile || (*profile)[0].Get<uint8>() != stat)
+                return 0;
+        }
+        return found;
     }
 }
 

@@ -7,8 +7,11 @@ name    mod-ptr-template: Worgen, Goblins and CoA classes
 #      (plate: warrior, paladin, death knight; mail: hunter, shaman; leather: rogue, druid;
 #      cloth: priest, mage, warlock), keeps its own spells and talents, and gets no piece it can
 #      never wear (a weapon type its class is not trained in is left out)
-#   3. the generic template 3 (gear for every class) lends a CoA class nothing
-# Own slots 12-14 and 18-20, each with a race/class pair no other scenario uses.
+#   3. a CoA class whose armor type has no template with its main stat (Reaper: agility, plate)
+#      borrows the agility templates of the best armor type below that has them (mail: hunter,
+#      Enhancement shaman)
+#   4. the generic template 3 (gear for every class) lends a CoA class nothing
+# Own slots 12-14 and 18-21, each with a race/class pair no other scenario uses.
 timeout 240s
 
 bot wd druid race=worgen slot=12
@@ -17,6 +20,7 @@ bot kx knightofxoroth slot=14
 bot wh witchhunter slot=18
 bot bb barbarian slot=19
 bot py pyromancer slot=20
+bot rp reaper slot=21
 
 place 1 16226.2 16257.0 13.2
 require wd race worgen
@@ -87,6 +91,20 @@ waitfor py worn 51231 timeout 30s
 expect py worn 50684
 expect py item 50732 == 0
 expect py nospell 17780
+
+# Reaper: plate, agility -> the agility mail templates
+as rp .template list
+expect output has "Hunter - Beast Mastery"
+expect output has "Shaman - Enhancement"
+expect output lacks "Shaman - Elemental"
+expect output lacks "Warrior"
+expect output lacks "Paladin"
+as rp .template apply 43
+expect output has "does not apply"
+as rp .template apply 29
+waitfor rp worn 51286 timeout 30s
+expect rp worn 50735
+expect rp item 50733 == 0
 
 wait 3s
 require wd alive

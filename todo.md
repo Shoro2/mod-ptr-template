@@ -1,9 +1,11 @@
 # Todo
 
 - (high) Host: ship the `.template apply` rules of 2026-10-09 (`5651edd`) with HOST11 (vault MIG-111).
-- (medium) Templates for the CoA classes 12-32: masks fit since 2026-09-20, but no rows exist and
-  `.template list` answers "no template info" (vault `12-server-todo.md` §2 row "Our modules' class limits
-  for ids 12-32").
+- (high) Host: the race and CoA template fit of 2026-10-17 rides the Chronicle host window (vault MIG-164).
+- (low) Own CoA templates: CoA classes borrow stock templates by armor type since 2026-10-17 (Reaper and
+  Wildwalker: the agility mail templates). Own CoA lists would be a generated per-role kit (operator to decide).
+- (low) Template 3's race masks are the stock race/class pairs (druid spells only Night Elf and Tauren); a
+  pair FL opened later (a Human druid, a Goblin mage) gets template 3's gear but not its class spells.
 - (low) `data/sql/db-world/template-blizzlike.sql` still inserts templates 1, 2, 3 and 6 (2 and 3 enabled).
   The workbench holds only 3 and 20-51 because the old `structure.sql` once dropped the tables and the
   2026-07-16 rework restored only template 3 (`template-wotlk-fresh80.sql`); a fresh database would get

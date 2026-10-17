@@ -4,11 +4,33 @@
 
 | Script | Type and hook | What |
 |---|---|---|
-| `createPTR` | `WorldScript`, `OnBeforeWorldInitialized()` | counts `mod_ptrtemplate_index` and logs `>> Loaded <n> templates in <ms> ms.` |
+| `createPTR` | `WorldScript`, `OnBeforeWorldInitialized()` | counts `mod_ptrtemplate_index` and logs `>> Loaded <n> templates in <ms> ms.`; then `TemplateFit::Load()` logs `>> Template armor types of the CoA classes: 12=leather ...` |
 | `schedulediff` | `WorldScript`, `OnUpdate(uint32 diff)` | drives the global `TaskScheduler scheduler` that runs the apply steps |
 | `createTemplate` | plain helper class, all methods static (was a hookless PlayerScript until 2026-10-17; its function-local statics registered in ScriptMgr and crashed the stop) | `HandleApply`, `CheckTemplateQualifier` and the `AddTemplate*` steps |
 | `announce` | `PlayerScript`, `OnPlayerLogin(Player*)` | the module message (`AnnounceEnable`); on a first login (`AT_LOGIN_FIRST`) applies `LoginTemplateIndex` when it is not 0 |
 | `ptr_template_commandscript` | `CommandScript` | the `.template` commands |
+
+## Whose rows a character reads (`TemplateFit`, FL 2026-10-17)
+
+Every masked query (the qualifier, the steps, the list) reads with `TemplateFit::RaceMask(player)` and
+`TemplateFit::ClassMask(player, index)` instead of the raw masks:
+
+| Helper | What |
+|---|---|
+| `RaceMask(Player*)` | the character's race bit plus its donor race's bit (`sRaceMgr->GetDonorRace`, worldserver.conf `Races.Donors`: Goblin 9 -> Orc 2, Worgen 12 -> Human 1). The template rows carry stock race masks only (the P4 rows 1791) |
+| `IsBorrowed(Player*)` | the character is a CoA class (12-32, `IsAscensionClass`): it borrows another class's template |
+| `Load()` | armor tier per class: the stock classes fixed (plate warrior / paladin / death knight, mail hunter / shaman, leather rogue / druid, cloth priest / mage / warlock); a CoA class the best armor proficiency spell it is created with in `playercreateinfo_spell_custom` (750 plate, 8737 mail, 9077 leather, 9078 cloth; none = cloth) |
+| `Load()` (stat fit) | when no template of a CoA class's tier has its main stat (`ascension_custom_class.primary_stat` against `mod_ptrtemplate_profile.MainStat`), the class moves to the best lower tier that has one and borrows only templates with that stat (the operator, 2026-10-17: Reaper and Wildwalker, agility on plate, get the agility mail templates: hunter and Enhancement shaman). Spirit (Chronomancer) matches no template and keeps its tier unfiltered |
+| `ArmorGroupMask(classId)` | the stock classes with that class's (stat-fitted) tier |
+| `ClassMask(Player*, index)` | a stock class: its own mask. A CoA class: the one stock class of its armor group that the template's inventory rows are for; 0 (the template does not apply) when none or several (the generic template 3), or when the class is stat-filtered and the template's profile has another main stat |
+
+A borrowed template applies level, taxi, homebind, achievements, quests, reputations, Paragon floor, gear,
+bag items, Paragon rolls (the lender's profile row), Remnants, position and resources. Skipped: spells (8),
+talents and glyphs (9, so no `resetTalents`), the hotbar (17). Skills (7): only skills the character
+already has, plus secondary skills and professions. Gear (12): a paper-doll piece goes on only when
+`CanUseItem(ItemTemplate*)` is OK and its skill is one the character holds (`CanWearBorrowedItem`); the
+rest is left out with one chat line, because CoA keeps each class's proficiency set and the login would
+mail such a piece away. `applyTemplate` tells the invoker first that the template is another class's.
 
 Loader: `Addmod_ptr_templateScripts()` -> `Add_ptr_template()` + `AddSC_ptr_template_commandscript()`.
 
@@ -17,7 +39,7 @@ Loader: `Addmod_ptr_templateScripts()` -> `Add_ptr_template()` + `AddSC_ptr_temp
 | Command | Security (code / `command` row) | Handler |
 |---|---|---|
 | `.template apply [player] <index>` | `SEC_PLAYER` / 0, not from the console | `applyTemplate(ChatHandler*, Optional<PlayerIdentifier>, uint32 index)`: the named player, else the selected player, else the invoker. The target must be online ("Player not found!" otherwise), and another character than the invoker's own needs a GameMaster ("You have low security level for this.", FL 2026-10-09); then `CheckTemplateQualifier` with the invoker's account level and `HandleApply` |
-| `.template list` | `SEC_PLAYER` / 0, console too | `listTemplate`: enabled templates from `EnableListSecurity`, disabled ones from `DisableListSecurity`, the status text from `StatusSecurityText`; with `ListFilterByClass` a player sees only templates whose inventory rows match their class |
+| `.template list` | `SEC_PLAYER` / 0, console too | `listTemplate`: enabled templates from `EnableListSecurity`, disabled ones from `DisableListSecurity`, the status text from `StatusSecurityText`; with `ListFilterByClass` a player sees only templates whose inventory rows match `TemplateFit::ClassMask` (a CoA class: the templates of its armor group, FL 2026-10-17) |
 | `.template enable <index>` / `disable <index>` | `SEC_ADMINISTRATOR` / 3, console too | `UPDATE mod_ptrtemplate_index SET Enable = 1 / 0` |
 
 ## Qualification (`CheckTemplateQualifier(Player*, uint32 index, uint8 enable, uint8 security)`)
@@ -26,7 +48,7 @@ In this order, each with its own `module_string` answer:
 1. Security (`security` = the invoker's account level): below both `EnableApplySecurity` and `DisableApplySecurity` ->
    `INSUFFICIENT_SECURITY_LEVEL`.
 2. A disabled template below `DisableApplySecurity` -> `TEMPLATE_DISABLED_LOCAL`.
-3. No row for the index with the character's race and class bits in any of the nine masked tables ->
+3. No row for the index with the character's race and class bits (`TemplateFit`, see above) in any of the nine masked tables ->
    `MISSING_TEMPLATE_INFO` ("does not apply to you").
 4. Not at the start level (heroic start level for a death knight) while `LevelEnable = false` ->
    `NOT_INITIAL_LEVEL`.
