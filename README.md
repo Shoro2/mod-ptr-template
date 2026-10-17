@@ -1,10 +1,20 @@
 # PTR Character Templates
 
-- AzerothCore build status as of the [latest commit](https://github.com/heyitsbench/mod-ptr-template/commit): [![core-build](https://github.com/heyitsbench/mod-ptr-template/actions/workflows/core-build.yml/badge.svg)](https://github.com/heyitsbench/mod-ptr-template/actions/workflows/core-build.yml)
-
 This is a module for [AzerothCore](http://www.azerothcore.org/) that adds commands for creating characters from preset templates.
+It is the Forgotten Land fork of [heyitsbench/mod-ptr-template](https://github.com/heyitsbench/mod-ptr-template);
+the upstream description is kept below and the fork's additions are described under "Forgotten Land additions".
 
 [Demonstration video](https://www.youtube.com/watch?v=VPczbaUCEvw) (35s)
+
+## Requirements
+
+- AzerothCore WotLK (3.3.5a). This fork links against Forgotten Land modules and therefore needs the
+  [Shoro2/azerothcore-wotlk](https://github.com/Shoro2/azerothcore-wotlk) fork (mod-paragon uses prepared
+  statements that only exist in the fork's core).
+- **mod-paragon**, **mod-paragon-itemgen** and **mod-forgotten-talents** must be in `modules/` and are built
+  with it (`ParagonUtils.h`, `ParagonItemGen.h`, `ForgottenTalentsService.h` are included unconditionally).
+  Their steps can be switched off in the conf, but the headers must be present to compile.
+- For the stock upstream module without these dependencies, use the upstream repository instead.
 
 ## Important Notes
 
@@ -30,16 +40,16 @@ Any incomplete template set queries will need to be run manually while in develo
 
 ### (Optional) Edit Module Configuration
 
-You are also able to edit the [mod_ptr_template.conf](https://github.com/heyitsbench/mod-ptr-template/blob/master/conf/mod_ptr_template.conf.dist) to your liking. At the time of writing, you can pick and choose what parts of the template sets it should apply, whether it announces itself on login, the security level required to apply templates, and whether it can only be applied at the start level of a character.
+Copy `conf/mod_ptr_template.conf.dist` to your `configs/modules/` folder as `mod_ptr_template.conf` and edit it to your liking. At the time of writing, you can pick and choose what parts of the template sets it should apply, whether it announces itself on login, the security level required to apply templates, and whether it can only be applied at the start level of a character.
 
 ## Usage
 
 By default, any account can list and apply enabled templates using `.template list` and `.template apply [template index number]` respectively. Gamemaster or higher security will also have disabled templates listed with the list command. Administrators are the only ones that can apply a disabled template. Administrators and the console are also the only ones that can enable/disable templates through the `.template enable/disable [template index number]` command.
 
-## Forgotten Land: the template kit (2026-09-28)
+## Forgotten Land additions: the template kit
 
 After talents, gear and bags a template now gives what a Forgotten Land character needs to play
-right away (the operator's request; every step has its own switch in the conf):
+right away (every step has its own switch in the conf):
 
 | Step | Conf | What |
 |---|---|---|
@@ -49,8 +59,11 @@ right away (the operator's request; every step has its own switch in the conf):
 | Paragon rolls | `TemplateParagonRolls` | mod-paragon-itemgen's Paragon enchantments on every worn item, **all cursed**, at the character's Paragon level; the template's profile in `mod_ptrtemplate_profile` (role, main stat, spec - templates 20-51) becomes the character's itemgen profile; a template without a row rolls with the character's own profile, or not at all |
 | Remnants | `TemplateRemnants`, `TemplateRemnants.Pct` (75) | each of mod-forgotten-talents' five currencies topped up to 75 % of what its whole tree costs under the live conf (`Service::FullTreeCost`) |
 
-The kit links against mod-paragon, mod-paragon-itemgen and mod-forgotten-talents (all FL modules
-built with it).
+The kit links against mod-paragon, mod-paragon-itemgen and mod-forgotten-talents (see Requirements).
+
+Further additions: the template tables' `RaceMask` / `ClassMask` columns are 32-bit so races and
+classes beyond the stock ones fit (Conquest of Azeroth classes borrow the gear of a stock class's template),
+and `data/sql/db-world/template-wotlk-p4-bis.sql` ships WotLK phase-4 best-in-slot spec templates.
 
 ## Creating Template Sets
 
@@ -59,6 +72,10 @@ For information on creating your own template sets (and submitting them here for
 ## How to Uninstall
 
 To uninstall the module, you must remove the module from the `modules` directory of your AC source, rerun CMake steps depending on your OS, and recompile. You will also need to run the `uninstall.sql` on your world DB to remove vestigial entries and tables.
+
+## License
+
+GNU AGPL v3, see `LICENSE`.
 
 ## Credits
 - [acidmanifesto](https://github.com/acidmanifesto) for providing portions of the [skip-dk-starting-area module](https://github.com/azerothcore/mod-skip-dk-starting-area) as well as an example of storing SQL results into variables.

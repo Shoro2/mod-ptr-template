@@ -1,5 +1,11 @@
 # mod-ptr-template
 
+> **Internal docs live in the vault, not here** (rule since 2026-10-18: this public repo keeps only
+> README.md with the general info and installation, this CLAUDE.md, the license and the code).
+> Index, data structure, functions, log and todo: share-public `docs/World of Warcraft/module-repos/mod-ptr-template/`
+> (local checkout `C:\Users\Anwender\Documents\GitHub\share-public`). Update them there,
+> in a vault worktree, in the same session as the code change.
+
 Forgotten Land's copy of the AzerothCore module mod-ptr-template (upstream `azerothcore/mod-ptr-template`
 by heyitsbench, imported 2026-07-13 at an older revision): `.template apply <index>` turns a character into
 a preset one - level, gear with enchants and gems, talents, glyphs, spells, skills, reputations, position.
@@ -53,7 +59,7 @@ bot is ready to play at once. On the host only GMs may apply templates. Full des
    workbench does not hold; todo, low).
 3. The inherited upstream CI cannot build the kit's FL includes (todo, low).
 
-Open points in full: [todo.md](todo.md).
+Open points in full: [todo.md](https://github.com/Shoro2/share-public/blob/main/docs/World%20of%20Warcraft/module-repos/mod-ptr-template/todo.md).
 
 ## Working here
 
@@ -75,4 +81,5 @@ Open points in full: [todo.md](todo.md).
 - Vault (`share-public/docs/World of Warcraft/`): `forgotten-land/14-ptr-bis-templates.md`,
   `forgotten-land/15-host-migration-log.md` (MIG-028, MIG-042, MIG-051, MIG-096), `testing/01-test-bots.md`,
   `12-server-todo.md`.
-- Doc set: INDEX.md, CLAUDE.md, data_structure.md, functions.md, log.md (newest first), todo.md.
+- Doc set: this CLAUDE.md; INDEX, data_structure, functions, log (newest first) and todo in share-public
+  `docs/World of Warcraft/module-repos/mod-ptr-template/`.
