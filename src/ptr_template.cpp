@@ -2,6 +2,156 @@
 
 using namespace Acore::ChatCommands;
 
+// FL: whose template rows a character reads. The template tables carry the race and class masks of
+// the stock races and classes only, and two kinds of character fall outside them:
+// - a race with a donor race (worldserver.conf Races.Donors: Goblin -> Orc, Worgen -> Human) reads
+//   its donor's rows, as the core does for quests and items;
+// - a Conquest of Azeroth class (12-32) borrows the gear of a stock class's template, of a class
+//   that wears the same best armor type (the operator, 2026-10-17). A CoA class's armor type is the
+//   best armor proficiency it is created with (playercreateinfo_spell_custom, CoA's world data:
+//   Plate 750, Mail 8737, Leather 9077, Cloth 9078); the stock classes keep theirs.
+namespace TemplateFit
+{
+    enum ArmorTier : uint8
+    {
+        ARMOR_NONE    = 0,
+        ARMOR_CLOTH   = 1,
+        ARMOR_LEATHER = 2,
+        ARMOR_MAIL    = 3,
+        ARMOR_PLATE   = 4
+    };
+
+    static std::array<uint8, MAX_CLASSES> classArmorTier{};
+
+    static uint8 StockArmorTier(uint8 classId)
+    {
+        switch (classId)
+        {
+            case CLASS_WARRIOR:
+            case CLASS_PALADIN:
+            case CLASS_DEATH_KNIGHT:
+                return ARMOR_PLATE;
+            case CLASS_HUNTER:
+            case CLASS_SHAMAN:
+                return ARMOR_MAIL;
+            case CLASS_ROGUE:
+            case CLASS_DRUID:
+                return ARMOR_LEATHER;
+            case CLASS_PRIEST:
+            case CLASS_MAGE:
+            case CLASS_WARLOCK:
+                return ARMOR_CLOTH;
+            default:
+                return ARMOR_NONE;
+        }
+    }
+
+    static uint8 ProficiencyArmorTier(uint32 spellId)
+    {
+        switch (spellId)
+        {
+            case 750:  return ARMOR_PLATE;
+            case 8737: return ARMOR_MAIL;
+            case 9077: return ARMOR_LEATHER;
+            case 9078: return ARMOR_CLOTH;
+            default:   return ARMOR_NONE;
+        }
+    }
+
+    static char const* ArmorTierName(uint8 tier)
+    {
+        switch (tier)
+        {
+            case ARMOR_PLATE:   return "plate";
+            case ARMOR_MAIL:    return "mail";
+            case ARMOR_LEATHER: return "leather";
+            default:            return "cloth";
+        }
+    }
+
+    static void Load()
+    {
+        classArmorTier.fill(ARMOR_NONE);
+        for (uint8 classId = CLASS_WARRIOR; classId < MAX_CLASSES; ++classId)
+            classArmorTier[classId] = StockArmorTier(classId);
+
+        //                                                  0          1
+        if (QueryResult result = WorldDatabase.Query("SELECT classmask, Spell FROM playercreateinfo_spell_custom WHERE Spell IN (750, 8737, 9077, 9078) AND classmask <> 0"))
+        {
+            do
+            {
+                uint32 const classMask = (*result)[0].Get<uint32>();
+                uint8 const tier = ProficiencyArmorTier((*result)[1].Get<uint32>());
+                for (uint8 classId = CLASS_WARRIOR; classId < MAX_CLASSES; ++classId)
+                    if (IsAscensionClass(classId) && (classMask & (1u << (classId - 1))))
+                        classArmorTier[classId] = std::max(classArmorTier[classId], tier);
+            } while (result->NextRow());
+        }
+
+        std::string text;
+        for (uint8 classId = CLASS_WARRIOR; classId < MAX_CLASSES; ++classId)
+        {
+            if (!IsAscensionClass(classId))
+                continue;
+            if (classArmorTier[classId] == ARMOR_NONE)
+                classArmorTier[classId] = ARMOR_CLOTH; // every class wears cloth
+            text += Acore::StringFormat("{}{}={}", text.empty() ? "" : " ", classId, ArmorTierName(classArmorTier[classId]));
+        }
+        LOG_INFO("module", ">> Template armor types of the CoA classes: {}", text);
+    }
+
+    // The stock classes that wear the same best armor type as `classId`.
+    static uint32 ArmorGroupMask(uint8 classId)
+    {
+        uint8 const tier = classId < MAX_CLASSES ? classArmorTier[classId] : ARMOR_NONE;
+        uint32 mask = 0;
+        if (tier != ARMOR_NONE)
+            for (uint8 stockClass = CLASS_WARRIOR; stockClass < CLASS_BARBARIAN; ++stockClass)
+                if (StockArmorTier(stockClass) == tier)
+                    mask |= 1u << (stockClass - 1);
+        return mask;
+    }
+
+    static uint32 RaceMask(Player* player)
+    {
+        uint32 mask = player->getRaceMask();
+        if (uint32 const donor = sRaceMgr->GetDonorRace(player->getRace()))
+            mask |= 1u << (donor - 1);
+        return mask;
+    }
+
+    // True when the character wears another class's template (a CoA class): only the template's
+    // gear, stats and world state fit it, not its class spells, talents, glyphs or action bars.
+    static bool IsBorrowed(Player* player)
+    {
+        return IsAscensionClass(player->getClass());
+    }
+
+    // The class mask the template's rows are read with; 0 when the template has nothing for the character.
+    // A CoA class reads the rows of the one stock class of its armor group that the template's gear
+    // is for. The generic template (gear for every class) names no single class and lends nothing.
+    static uint32 ClassMask(Player* player, uint32 index)
+    {
+        if (!IsBorrowed(player))
+            return player->getClassMask();
+
+        uint32 const group = ArmorGroupMask(player->getClass());
+        if (!group)
+            return 0;
+
+        uint32 found = 0;
+        //                                                  0
+        if (QueryResult result = WorldDatabase.Query("SELECT DISTINCT ClassMask FROM mod_ptrtemplate_inventory WHERE ID = {} AND ClassMask & {}", index, group))
+        {
+            do
+            {
+                found |= (*result)[0].Get<uint32>() & group;
+            } while (result->NextRow());
+        }
+        return (found && !(found & (found - 1))) ? found : 0;
+    }
+}
+
 class createPTR : public WorldScript {
 
 public:
@@ -26,6 +176,7 @@ public:
             ++count;
         } while (result->NextRow());
         LOG_INFO("module", ">> Loaded {} templates in {} ms.", count, GetMSTimeDiffToNow(oldMSTime));
+        TemplateFit::Load();
         return;
     }
 };
@@ -244,8 +395,8 @@ public:
     // the target's: a player must not pass the check by naming a GameMaster's character.
     static uint8 CheckTemplateQualifier(Player* player, uint32 index, uint8 enable, uint8 security)
     {
-        uint32 raceMask = player->getRaceMask();
-        uint32 classMask = player->getClassMask();
+        uint32 raceMask = TemplateFit::RaceMask(player);
+        uint32 classMask = TemplateFit::ClassMask(player, index);
 
         QueryResult queryCheck = WorldDatabase.Query( // These are used to figure out if a template has a race/class in mind.
             "SELECT COUNT(*) FROM(" //                   For example, the AQ40 blizzlike template doesn't apply to belfs, draenei, or DKs.
@@ -313,7 +464,7 @@ public:
 private:
     static void AddTemplateAchievements(Player* player, uint32 index)
     { //                                                                0
-        QueryResult achievementInfo = WorldDatabase.Query("SELECT AchievementID FROM mod_ptrtemplate_achievements WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+        QueryResult achievementInfo = WorldDatabase.Query("SELECT AchievementID FROM mod_ptrtemplate_achievements WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, TemplateFit::RaceMask(player), TemplateFit::ClassMask(player, index));
         if (achievementInfo)
         {
             AchievementEntry const* achievementID;
@@ -329,7 +480,7 @@ private:
 
     static void AddTemplateBagGear(Player* player, uint32 index) // Handles bag items and currency.
     { //                                                    0      1       2        3         4         5         6         7         8         9         10
-        QueryResult bagInfo = WorldDatabase.Query("SELECT BagID, SlotID, ItemID, Quantity, Enchant0, Enchant1, Enchant2, Enchant3, Enchant4, Enchant5, Enchant6 FROM mod_ptrtemplate_inventory WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+        QueryResult bagInfo = WorldDatabase.Query("SELECT BagID, SlotID, ItemID, Quantity, Enchant0, Enchant1, Enchant2, Enchant3, Enchant4, Enchant5, Enchant6 FROM mod_ptrtemplate_inventory WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, TemplateFit::RaceMask(player), TemplateFit::ClassMask(player, index));
         if (bagInfo)
         {
             CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
@@ -536,11 +687,14 @@ private:
 
     static void AddTemplateHotbar(Player* player, uint32 index)
     {
+        if (TemplateFit::IsBorrowed(player)) // another class's buttons: the character keeps its own
+            return;
+
         for (uint8 j = ACTION_BUTTON_BEGIN; j <= MAX_ACTION_BUTTONS; j++)
             player->removeActionButton(j);
 
         //                                                  0       1      2
-        QueryResult barInfo = WorldDatabase.Query("SELECT Button, Action, Type FROM mod_ptrtemplate_action WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+        QueryResult barInfo = WorldDatabase.Query("SELECT Button, Action, Type FROM mod_ptrtemplate_action WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, TemplateFit::RaceMask(player), TemplateFit::ClassMask(player, index));
         if (barInfo)
         {
             do
@@ -602,7 +756,7 @@ private:
 
     static void AddTemplateQuests(Player* player, uint32 index)
     { //                                                       0
-        QueryResult questInfo = WorldDatabase.Query("SELECT QuestID FROM mod_ptrtemplate_quests WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+        QueryResult questInfo = WorldDatabase.Query("SELECT QuestID FROM mod_ptrtemplate_quests WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, TemplateFit::RaceMask(player), TemplateFit::ClassMask(player, index));
         if (questInfo)
         {
             do
@@ -615,7 +769,7 @@ private:
 
     static void AddTemplateReputation(Player* player, uint32 index)
     { //                                                      0         1
-        QueryResult repInfo = WorldDatabase.Query("SELECT FactionID, Standing FROM mod_ptrtemplate_reputations WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+        QueryResult repInfo = WorldDatabase.Query("SELECT FactionID, Standing FROM mod_ptrtemplate_reputations WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, TemplateFit::RaceMask(player), TemplateFit::ClassMask(player, index));
         if (repInfo)
         {
             do
@@ -648,7 +802,7 @@ private:
 
     static void AddTemplateSkills(Player* player, uint32 index)
     { //                                                       0       1     2
-        QueryResult skillInfo = WorldDatabase.Query("SELECT SkillID, Value, Max FROM mod_ptrtemplate_skills WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+        QueryResult skillInfo = WorldDatabase.Query("SELECT SkillID, Value, Max FROM mod_ptrtemplate_skills WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, TemplateFit::RaceMask(player), TemplateFit::ClassMask(player, index));
         if (skillInfo)
         {
             do
@@ -660,6 +814,15 @@ private:
                 if (((player->GetSkillValue(skillEntry) >= valueEntry) && (player->GetMaxSkillValue(skillEntry) >= maxEntry)) && sConfigMgr->GetOption<bool>("MaintainImprovedValues", true))
                     continue;
 
+                // A borrowed template raises the weapon, armor and class skills the character
+                // already has; SetSkill would teach the lender's others (CoA keeps its own set).
+                if (TemplateFit::IsBorrowed(player) && !player->HasSkill(skillEntry))
+                {
+                    SkillLineEntry const* skillLine = sSkillLineStore.LookupEntry(skillEntry);
+                    if (!skillLine || (skillLine->categoryId != SKILL_CATEGORY_SECONDARY && skillLine->categoryId != SKILL_CATEGORY_PROFESSION))
+                        continue;
+                }
+
                 player->SetSkill(skillEntry, 0, valueEntry, maxEntry); // Don't know what step overload is used for, being zeroed here.
                 LOG_DEBUG("module", "Added skill {} to template character {} with curvalue {} and maxvalue {}.", skillEntry, player->GetGUID().ToString(), valueEntry, maxEntry);
             } while (skillInfo->NextRow());
@@ -668,8 +831,12 @@ private:
     }
 
     static void AddTemplateSpells(Player* player, uint32 index)
-    { //                                                       0
-        QueryResult spellInfo = WorldDatabase.Query("SELECT SpellID FROM mod_ptrtemplate_spells WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+    {
+        if (TemplateFit::IsBorrowed(player)) // the lender's class spells
+            return;
+
+        //                                                       0
+        QueryResult spellInfo = WorldDatabase.Query("SELECT SpellID FROM mod_ptrtemplate_spells WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, TemplateFit::RaceMask(player), TemplateFit::ClassMask(player, index));
         if (spellInfo)
         {
             do
@@ -689,11 +856,14 @@ private:
 
     static void AddTemplateTalents(Player* player, uint32 index)
     {
+        if (TemplateFit::IsBorrowed(player)) // the lender's talent tree and glyphs; the character keeps its own
+            return;
+
         // Wipe any pre-existing talents/glyphs so the template build applies from a clean slate.
         player->resetTalents(true);
 
         //                                                        0
-        QueryResult talentInfo = WorldDatabase.Query("SELECT SpellID FROM mod_ptrtemplate_talents WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+        QueryResult talentInfo = WorldDatabase.Query("SELECT SpellID FROM mod_ptrtemplate_talents WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, TemplateFit::RaceMask(player), TemplateFit::ClassMask(player, index));
         if (talentInfo)
         {
             // Resolve each final-rank talent spell to its Talent.dbc entry, then apply in ascending
@@ -729,7 +899,7 @@ private:
         }
 
         //                                                      0      1
-        QueryResult glyphInfo = WorldDatabase.Query("SELECT Slot, GlyphID FROM mod_ptrtemplate_glyphs WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+        QueryResult glyphInfo = WorldDatabase.Query("SELECT Slot, GlyphID FROM mod_ptrtemplate_glyphs WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, TemplateFit::RaceMask(player), TemplateFit::ClassMask(player, index));
         if (glyphInfo)
         {
             do
@@ -923,7 +1093,7 @@ private:
 
     static bool LoadTemplateProfile(Player* player, uint32 index, ParagonRollProfile& profile)
     { //                                                   0      1         2
-        QueryResult result = WorldDatabase.Query("SELECT Role, MainStat, SpecID FROM mod_ptrtemplate_profile WHERE (ID = {} AND ClassMask & {})", index, player->getClassMask());
+        QueryResult result = WorldDatabase.Query("SELECT Role, MainStat, SpecID FROM mod_ptrtemplate_profile WHERE (ID = {} AND ClassMask & {})", index, TemplateFit::ClassMask(player, index));
         if (!result)
             return false;
 
@@ -1003,9 +1173,10 @@ private:
 
     static void AddTemplateWornGear(Player* player, uint32 index) // Handles paper doll items and equipped bags.
     { //                                                     0      1       2        3         4         5         6         7         8         9
-        QueryResult gearInfo = WorldDatabase.Query("SELECT BagID, SlotID, ItemID, Enchant0, Enchant1, Enchant2, Enchant3, Enchant4, Enchant5, Enchant6 FROM mod_ptrtemplate_inventory WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, player->getRaceMask(), player->getClassMask());
+        QueryResult gearInfo = WorldDatabase.Query("SELECT BagID, SlotID, ItemID, Enchant0, Enchant1, Enchant2, Enchant3, Enchant4, Enchant5, Enchant6 FROM mod_ptrtemplate_inventory WHERE (ID = {} AND RaceMask & {} AND ClassMask & {})", index, TemplateFit::RaceMask(player), TemplateFit::ClassMask(player, index));
         if (gearInfo)
         {
+            uint32 leftOut = 0;
             do
             {
                 uint32 bagEntry = (*gearInfo)[0].Get<uint32>();
@@ -1014,6 +1185,12 @@ private:
 
                 if ((slotEntry >= INVENTORY_SLOT_BAG_END && slotEntry < BANK_SLOT_BAG_START) || (slotEntry >= BANK_SLOT_BAG_END && slotEntry < PLAYER_SLOT_END) || bagEntry != CONTAINER_BACKPACK) // If item is not either an equipped armorpiece, weapon, or container.
                     continue;
+
+                if (slotEntry < EQUIPMENT_SLOT_END && TemplateFit::IsBorrowed(player) && !CanWearBorrowedItem(player, itemEntry))
+                {
+                    ++leftOut;
+                    continue;
+                }
 
                 if (slotEntry >= PLAYER_SLOT_END)
                     player->SetAmmo(itemEntry);
@@ -1034,7 +1211,24 @@ private:
 
                 TemplateHelperItemEnchants(gearInfo, player, item, 3);
             } while (gearInfo->NextRow());
+
+            if (leftOut)
+                ChatHandler(player->GetSession()).PSendSysMessage("{} item(s) of this template are not for your class and were left out.", leftOut);
         }
+    }
+
+    // A borrowed template's piece the character can never wear - another class's tier piece or
+    // relic, a weapon type its class is not trained in - is left out: equipped anyway, the core
+    // would mail it away at the next login (_LoadInventory). The skill must be one the character
+    // holds now: CoA keeps each class's proficiency set itself, so the kit must not teach others.
+    static bool CanWearBorrowedItem(Player* player, uint32 itemEntry)
+    {
+        ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemEntry);
+        if (!proto || player->CanUseItem(proto) != EQUIP_ERR_OK)
+            return false;
+
+        uint32 const skill = proto->GetSkill();
+        return !skill || player->HasSkill(skill);
     }
 
     static void TemplateHelperItemCleanup(Player* player, uint8 scope, uint8 method)
@@ -1353,6 +1547,9 @@ public:
                 default:
                     break;
             }
+            if (TemplateFit::IsBorrowed(target))
+                handler->PSendSysMessage("This template is for another class: {} gets its gear, level and reputations, but keeps its own spells, talents, glyphs and action bars.", target->GetName());
+
             uint32 oldMSTime = getMSTime();
             createTemplate::HandleApply(target, index);
             LOG_DEBUG("module", "Handled template apply for character {} in {} ms.", player->GetGUID().ToString(), (GetMSTimeDiffToNow(oldMSTime) - 100));
@@ -1379,13 +1576,13 @@ public:
             // Only show templates applicable to the player's class. The index carries no class column,
             // so class membership is derived from the ClassMask on the template's inventory rows.
             // Console/GM listing is unaffected; toggle via ListFilterByClass.
-            uint32 playerClassMask = 0;
+            // FL: a CoA class is shown the templates it may borrow (TemplateFit::ClassMask).
+            Player* listPlayer = nullptr;
             bool filterByClass = !handler->IsConsole() && sConfigMgr->GetOption<bool>("ListFilterByClass", true);
             if (filterByClass)
             {
-                if (Player* player = handler->GetSession()->GetPlayer())
-                    playerClassMask = player->getClassMask();
-                else
+                listPlayer = handler->GetSession()->GetPlayer();
+                if (!listPlayer)
                     filterByClass = false;
             }
 
@@ -1396,8 +1593,8 @@ public:
 
                 if (filterByClass)
                 {
-                    QueryResult classMatch = WorldDatabase.Query("SELECT 1 FROM mod_ptrtemplate_inventory WHERE ID = {} AND ClassMask & {} LIMIT 1", indexEntry, playerClassMask);
-                    if (!classMatch)
+                    uint32 const classMask = TemplateFit::ClassMask(listPlayer, indexEntry);
+                    if (!classMask || !WorldDatabase.Query("SELECT 1 FROM mod_ptrtemplate_inventory WHERE ID = {} AND ClassMask & {} LIMIT 1", indexEntry, classMask))
                         continue;
                 }
 

@@ -16,8 +16,10 @@
 #include "TaskScheduler.h"
 
 #include <algorithm>
+#include <array>
 #include <iterator>
 #include <limits>
+#include <string>
 #include <utility>
 #include <vector>
 

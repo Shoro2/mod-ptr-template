@@ -1,0 +1,96 @@
+name    mod-ptr-template: Worgen, Goblins and CoA classes
+# The template fit of 2026-10-17 (player report: "The selected template does not apply to you" for a
+# Worgen druid on the P4 druid templates):
+#   1. a Worgen and a Goblin on a stock class read their donor race's rows (Human, Orc) and get the
+#      whole template: gear, talents, level
+#   2. a CoA class lists and wears the templates of the stock classes with its best armor type
+#      (plate: warrior, paladin, death knight; mail: hunter, shaman; leather: rogue, druid;
+#      cloth: priest, mage, warlock), keeps its own spells and talents, and gets no piece it can
+#      never wear (a weapon type its class is not trained in is left out)
+#   3. the generic template 3 (gear for every class) lends a CoA class nothing
+# Own slots 12-14 and 18-20, each with a race/class pair no other scenario uses.
+timeout 240s
+
+bot wd druid race=worgen slot=12
+bot gm2 mage race=goblin slot=13
+bot kx knightofxoroth slot=14
+bot wh witchhunter slot=18
+bot bb barbarian slot=19
+bot py pyromancer slot=20
+
+place 1 16226.2 16257.0 13.2
+require wd race worgen
+require gm2 race goblin
+
+# 1. Worgen druid, Balance (24); Goblin mage, Arcane (31)
+as wd .template list
+expect output has "Druid - Balance"
+expect output has "Druid - Restoration"
+as wd .template apply 24
+expect output lacks "does not apply"
+waitfor wd worn 51290 timeout 30s
+expect wd worn 50734
+expect wd hasspell 5570
+
+as gm2 .template apply 31
+expect output lacks "does not apply"
+waitfor gm2 worn 51281 timeout 30s
+expect gm2 worn 50732
+expect gm2 hasspell 11069
+
+# 2. CoA classes: plate (Knight of Xoroth -> Warrior Arms 49)
+as kx .template list
+expect output has "Warrior - Arms"
+expect output has "Paladin - Holy"
+expect output has "Death Knight - Blood Tank"
+expect output lacks "Druid"
+expect output lacks "Mage"
+expect output lacks "Wrath Classic Level 80"
+as kx .template apply 3
+expect output has "does not apply"
+as kx .template apply 31
+expect output has "does not apply"
+as kx .template apply 49
+expect output has "This template is for another class"
+waitfor kx worn 51227 timeout 30s
+expect kx worn 51225
+expect kx nospell 12294
+
+# mail (Witch Hunter -> Hunter Beast Mastery 28): bow yes, polearm left out (no Polearms)
+as wh .template list
+expect output has "Hunter - Beast Mastery"
+expect output has "Shaman - Elemental"
+expect output lacks "Warrior"
+as wh .template apply 28
+waitfor wh worn 51286 timeout 30s
+expect wh worn 50638
+expect wh item 50735 == 0
+expect wh nospell 19431
+
+# leather (Barbarian -> Rogue Assassination 40): daggers left out (no Daggers)
+as bb .template list
+expect output has "Rogue - Assassination"
+expect output has "Druid - Feral DPS"
+expect output lacks "Hunter"
+as bb .template apply 40
+waitfor bb worn 51252 timeout 30s
+expect bb item 50736 == 0
+expect bb nospell 1329
+
+# cloth (Pyromancer -> Warlock Affliction 46): wand yes, one-handed sword left out (no Swords)
+as py .template list
+expect output has "Warlock - Affliction"
+expect output has "Priest - Shadow"
+expect output lacks "Rogue"
+as py .template apply 46
+waitfor py worn 51231 timeout 30s
+expect py worn 50684
+expect py item 50732 == 0
+expect py nospell 17780
+
+wait 3s
+require wd alive
+require kx alive
+
+cleanup
+log ptr template races/coa done
